@@ -60,6 +60,18 @@ tokens via inline CSS vars — they are palettes only; layout, type, radius,
 and motion never change per scheme. New schemes must define enough contrast
 for chips and keep gold readable for the Faith page.
 
+## Class colors (v0.8)
+
+Classes carry one of six fixed swatches (the `CLASS_COLORS` array in
+app/index.html) shown as 8px dots on task rows and filter chips:
+
+`#1E7A4B` green (brand) · `#B98A1C` amber · `#D95B2B` clay ·
+`#4A7BA6` slate blue · `#8A5FA8` plum · `#2E8C7E` teal
+
+The last three exist ONLY for class identity dots/swatches — never use them
+for text, buttons, or surfaces. They read acceptably on both light and dark
+papers at dot size.
+
 ## Rules
 
 - No new colors or fonts without updating this file. Gold stays on Faith.

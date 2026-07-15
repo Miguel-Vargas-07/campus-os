@@ -224,6 +224,28 @@ friends: [
 - If live sync ever happens (Supabase phase 2.5), the snapshot shape is the
   sync payload — swap "paste a code" for "fetch rows", keep everything else.
 
+## v0.8 additions (SCHEMA_VERSION = 8)
+
+**Classes database:**
+
+```js
+classes: [ { id, name, code, color, schedule } ]  // color ∈ CLASS_COLORS
+// tasks: cls (free text) REPLACED by classId ("" = no class)
+```
+
+- `migrate()` v7→v8 groups existing `task.cls` strings case-insensitively,
+  creates one class per distinct name (colors assigned round-robin from
+  `CLASS_COLORS`), sets `task.classId`, deletes `task.cls`.
+- Assignments form: class `<select>` (`#tClass`, options rebuilt in
+  `renderTasks()`, selection preserved). "＋ class" chip toggles an inline
+  create form (name, code, schedule, color swatch row → `newClassColor`).
+- Class filter chips (`#classFilters`, `taskClassFilter` state) show dot +
+  code-or-name + open count; ✕ inside the chip deletes the class after
+  confirm (tasks keep running with `classId:""`). Both filters (status +
+  class) apply to the list.
+- `classById(id)` helper; `taskRow()` renders a colored `.dot` + class name.
+- CLASS_COLORS palette documented in DESIGN.md — dots/swatches only.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

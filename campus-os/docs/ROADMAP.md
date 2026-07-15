@@ -8,10 +8,10 @@ Claude session comfortably.
 1. ~~**Internship application tracker**~~ shipped in v0.6 — Internships view,
    `apps` array, kanban columns by status (wishlist → applied → OA →
    interview → offer/rejected), deadline/link/notes, edit-in-form.
-2. **Classes database** ← NEXT — `classes` array (name, code, color, schedule);
-   assignments reference a classId instead of free text; class filter chips
-   on the Assignments view.
-3. **Calendar view** — month grid rendering tasks by due date.
+2. ~~**Classes database**~~ shipped in v0.8 — `classes` array (name, code,
+   color, schedule), tasks reference classId, class filter chips + inline
+   class management on the Assignments view.
+3. **Calendar view** ← NEXT — month grid rendering tasks by due date.
 4. **Kanban view for assignments** — status columns with click-to-advance
    (data model already supports it).
 5. **Recurring habits config** — per-habit target days (e.g., lift MWF),

@@ -132,6 +132,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .filters{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
 .filters button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
 .filters button.on{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:baseline}
+.cf-del{margin-left:4px;opacity:.4;font-size:10px}
+.cf-del:hover{opacity:1;color:var(--flag)}
+.color-row{display:flex;gap:6px;align-items:center}
+.swc{width:22px;height:22px;border-radius:50%;border:2px solid transparent;padding:0}
+.swc.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--card) inset}
 
 /* ---------- Today ---------- */
 .greet-card{
@@ -394,13 +400,21 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
     </div>
     <div class="form-row">
       <input type="text" id="tTitle" placeholder="Assignment or task title">
-      <input type="text" id="tCls" placeholder="Class / context" style="max-width:150px">
+      <select id="tClass" style="max-width:160px"></select>
       <input type="date" id="tDue">
       <select id="tPriority">
         <option value="low">Low</option><option value="med" selected>Med</option><option value="high">High</option>
       </select>
       <button class="btn primary" id="tAdd">Add task</button>
     </div>
+    <div class="form-row" id="clsForm" style="display:none">
+      <input type="text" id="cName" placeholder="Class name (e.g. CS 201)" style="max-width:170px">
+      <input type="text" id="cCode" placeholder="Code (optional)" style="max-width:130px">
+      <input type="text" id="cSched" placeholder="Schedule (e.g. MWF 10am)" style="max-width:170px">
+      <div class="color-row" id="cColors"></div>
+      <button class="btn primary" id="cAdd">Add class</button>
+    </div>
+    <div class="filters" id="classFilters"></div>
     <div class="filters" id="taskFilters">
       <button data-f="all" class="on">All</button><button data-f="todo">Todo</button>
       <button data-f="doing">Doing</button><button data-f="done">Done</button>
@@ -579,7 +593,7 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -613,18 +627,25 @@ function dayOfYear(){
   return Math.floor((d-start)/86400000);
 }
 const MOODS = ["😖","😕","😐","🙂","😄"];
+const CLASS_COLORS = ["#1E7A4B","#B98A1C","#D95B2B","#4A7BA6","#8A5FA8","#2E8C7E"]; // see docs/DESIGN.md
+function classById(id){ return state.classes.find(c=>c.id===id) || null; }
 
 /* ---------- state ---------- */
 function seed(){
   const t = new Date(), plus = n => {const d=new Date(t);d.setDate(t.getDate()+n);return dateStr(d);};
+  const cCS   = {id:uid(),name:"CS 101",code:"CS101",color:CLASS_COLORS[0],schedule:"MWF 10am"};
+  const cMath = {id:uid(),name:"Math",  code:"",     color:CLASS_COLORS[1],schedule:""};
+  const cCar  = {id:uid(),name:"Career",code:"",     color:CLASS_COLORS[3],schedule:""};
+  const cLife = {id:uid(),name:"Life",  code:"",     color:CLASS_COLORS[4],schedule:""};
   return {
     schema: SCHEMA_VERSION,
     settings: {name:"Miguel", scheme:"auto", shareId:uid()},
+    classes: [cCS, cMath, cCar, cLife],
     tasks: [
-      {id:uid(),title:"CS 101 — Problem set 3",cls:"CS 101",due:plus(1),priority:"high",status:"doing",created:new Date().toISOString()},
-      {id:uid(),title:"Trig worksheet — inverse functions",cls:"Math",due:plus(3),priority:"med",status:"todo",created:new Date().toISOString()},
-      {id:uid(),title:"Update internship résumé",cls:"Career",due:plus(6),priority:"med",status:"todo",created:new Date().toISOString()},
-      {id:uid(),title:"Plan Saturday with Vic",cls:"Life",due:plus(4),priority:"low",status:"todo",created:new Date().toISOString()}
+      {id:uid(),title:"CS 101 — Problem set 3",classId:cCS.id,due:plus(1),priority:"high",status:"doing",created:new Date().toISOString()},
+      {id:uid(),title:"Trig worksheet — inverse functions",classId:cMath.id,due:plus(3),priority:"med",status:"todo",created:new Date().toISOString()},
+      {id:uid(),title:"Update internship résumé",classId:cCar.id,due:plus(6),priority:"med",status:"todo",created:new Date().toISOString()},
+      {id:uid(),title:"Plan Saturday with Vic",classId:cLife.id,due:plus(4),priority:"low",status:"todo",created:new Date().toISOString()}
     ],
     habits: [
       {id:uid(),name:"Workout",log:{}},
@@ -688,6 +709,25 @@ function migrate(data){
     data.settings.shareId = data.settings.shareId || uid();
     data.schema = 7;
   }
+  if(data.schema === 7){
+    // v8: classes become real objects; tasks' free-text cls → classId
+    data.classes = data.classes || [];
+    const byName = {};
+    data.classes.forEach(c=>byName[c.name.toLowerCase()] = c);
+    data.tasks.forEach(t=>{
+      const name = (t.cls||"").trim();
+      if(name){
+        const key = name.toLowerCase();
+        if(!byName[key]){
+          const c = {id:uid(), name, code:"", color:CLASS_COLORS[Object.keys(byName).length % CLASS_COLORS.length], schedule:""};
+          byName[key] = c; data.classes.push(c);
+        }
+        t.classId = byName[key].id;
+      } else t.classId = t.classId || "";
+      delete t.cls;
+    });
+    data.schema = 8;
+  }
   return data;
 }
 
@@ -709,10 +749,26 @@ function save(){
   catch(e){ storageOK = false; $("#storageWarn").style.display = "block"; }
 }
 
-/* ---------- actions: tasks ---------- */
-function addTask(title, cls, due, priority){
+/* ---------- actions: tasks & classes ---------- */
+function addTask(title, classId, due, priority){
   if(!title.trim()) return;
-  state.tasks.push({id:uid(),title:title.trim(),cls:cls.trim(),due,priority,status:"todo",created:new Date().toISOString()});
+  state.tasks.push({id:uid(),title:title.trim(),classId:classId||"",due,priority,status:"todo",created:new Date().toISOString()});
+  save(); render();
+}
+let newClassColor = CLASS_COLORS[0];
+function addClass(name, code, schedule){
+  if(!name.trim()) return;
+  if(state.classes.some(c=>c.name.toLowerCase()===name.trim().toLowerCase())) return;
+  state.classes.push({id:uid(),name:name.trim(),code:code.trim(),color:newClassColor,schedule:schedule.trim()});
+  save(); render();
+}
+function deleteClass(id){
+  const c = classById(id); if(!c) return;
+  const n = state.tasks.filter(t=>t.classId===id).length;
+  if(!confirm(`Delete ${c.name}?${n?` ${n} task${n!==1?"s":""} will keep no class.`:""}`)) return;
+  state.tasks.forEach(t=>{ if(t.classId===id) t.classId=""; });
+  state.classes = state.classes.filter(c=>c.id!==id);
+  if(taskClassFilter===id) taskClassFilter = "all";
   save(); render();
 }
 function cycleStatus(id){
@@ -929,6 +985,7 @@ function nudgeFriend(id, btn){
 /* ---------- rendering ---------- */
 let activeView = "today";
 let taskFilter = "all";
+let taskClassFilter = "all";
 
 function statusChip(t){
   return `<button class="status-btn" data-cycle="${t.id}" title="Click to advance">
@@ -937,10 +994,11 @@ function statusChip(t){
 function priChip(p){ return `<span class="chip ${p}">${p.toUpperCase()}</span>`; }
 function taskRow(t){
   const overdue = t.due && t.due < todayStr() && t.status!=="done";
+  const c = classById(t.classId);
   return `<div class="task">
     ${statusChip(t)}
     <span class="t-title ${t.status==="done"?"done-text":""}">${esc(t.title)}
-      ${t.cls?`<span class="t-cls"> · ${esc(t.cls)}</span>`:""}</span>
+      ${c?`<span class="t-cls"> · <span class="dot" style="background:${c.color}"></span> ${esc(c.name)}</span>`:""}</span>
     ${priChip(t.priority)}
     <span class="t-due">${overdue?`<span class="chip overdue">${fmtDue(t.due)}</span>`:fmtDue(t.due)}</span>
     <button class="x" data-del="${t.id}" title="Delete">✕</button>
@@ -983,8 +1041,29 @@ function renderToday(){
 }
 
 function renderTasks(){
+  // class select in the add form (preserve selection across re-renders)
+  const sel = $("#tClass"), prev = sel.value;
+  sel.innerHTML = `<option value="">No class</option>` +
+    state.classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  if([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+
+  // class filter chips + manage
+  $("#classFilters").innerHTML =
+    `<button data-cf="all" class="${taskClassFilter==="all"?"on":""}">All classes</button>` +
+    state.classes.map(c=>{
+      const n = state.tasks.filter(t=>t.classId===c.id && t.status!=="done").length;
+      return `<button data-cf="${c.id}" class="${taskClassFilter===c.id?"on":""}" title="${esc(c.schedule||"")}">
+        <span class="dot" style="background:${c.color}"></span> ${esc(c.code||c.name)}${n?` · ${n}`:""}
+        <span class="cf-del" data-cdel="${c.id}" title="Delete class">✕</span></button>`;
+    }).join("") +
+    `<button data-ctoggle="1">＋ class</button>`;
+
+  $("#cColors").innerHTML = CLASS_COLORS.map(col=>
+    `<button class="swc ${newClassColor===col?"on":""}" data-ccolor="${col}" style="background:${col}" aria-label="class color"></button>`).join("");
+
   const list = state.tasks
     .filter(t=>taskFilter==="all"||t.status===taskFilter)
+    .filter(t=>taskClassFilter==="all"||t.classId===taskClassFilter)
     .sort((a,b)=>{
       if(a.status==="done"&&b.status!=="done") return 1;
       if(b.status==="done"&&a.status!=="done") return -1;
@@ -1462,6 +1541,10 @@ document.body.addEventListener("click",e=>{
   const am  = e.target.closest("[data-amove]"); if(am) return moveApp(am.dataset.amove, Number(am.dataset.dir));
   const ad  = e.target.closest("[data-adel]");  if(ad) return deleteApp(ad.dataset.adel);
   const ae  = e.target.closest("[data-aedit]"); if(ae) return editApp(ae.dataset.aedit);
+  const cdl = e.target.closest("[data-cdel]");  if(cdl) return deleteClass(cdl.dataset.cdel);
+  const cf  = e.target.closest("[data-cf]");    if(cf){ taskClassFilter = cf.dataset.cf; renderTasks(); return; }
+  const ctg = e.target.closest("[data-ctoggle]");if(ctg){ const f=$("#clsForm"); f.style.display = f.style.display==="none"?"flex":"none"; if(f.style.display==="flex") $("#cName").focus(); return; }
+  const cco = e.target.closest("[data-ccolor]"); if(cco){ newClassColor = cco.dataset.ccolor; renderTasks(); return; }
   const lbm = e.target.closest("[data-lbm]");   if(lbm){ lbMetric = lbm.dataset.lbm; renderFriends(); return; }
   const fn  = e.target.closest("[data-fnudge]");if(fn) return nudgeFriend(fn.dataset.fnudge, fn);
   const fd  = e.target.closest("[data-fdel]");  if(fd) return deleteFriend(fd.dataset.fdel);
@@ -1475,9 +1558,15 @@ $("#quickInput").addEventListener("keydown",e=>{
 });
 $("#reflectNudge").addEventListener("click",()=>switchView("reflect"));
 $("#tAdd").addEventListener("click",()=>{
-  addTask($("#tTitle").value, $("#tCls").value, $("#tDue").value, $("#tPriority").value);
-  $("#tTitle").value=""; $("#tCls").value=""; $("#tDue").value="";
+  addTask($("#tTitle").value, $("#tClass").value, $("#tDue").value, $("#tPriority").value);
+  $("#tTitle").value=""; $("#tDue").value="";
 });
+$("#cAdd").addEventListener("click",()=>{
+  addClass($("#cName").value, $("#cCode").value, $("#cSched").value);
+  $("#cName").value=""; $("#cCode").value=""; $("#cSched").value="";
+  $("#clsForm").style.display = "none";
+});
+$("#cName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#cAdd").click(); });
 $("#tTitle").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tAdd").click(); });
 $("#taskFilters").addEventListener("click",e=>{
   const b = e.target.closest("button[data-f]"); if(!b) return;

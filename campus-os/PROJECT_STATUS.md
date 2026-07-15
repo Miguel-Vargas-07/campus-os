@@ -14,7 +14,8 @@
 
 ## Version
 
-- **v0.7** — July 15, 2026. Friends circle + leaderboard (friend codes).
+- **v0.8** — July 15, 2026. Classes database.
+- v0.7 — July 15, 2026. Friends circle + leaderboard (friend codes).
 - v0.6 — July 15, 2026. Internship application tracker (kanban).
 - v0.5 — July 14, 2026. Obsidian-style notes + color scheme gallery.
 - v0.4 — July 14, 2026. Day/night/auto theme.
@@ -22,7 +23,7 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.7)
+## What is DONE (v0.8)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -80,13 +81,18 @@ localStorage + export/import, responsive, seed data), plus:
       codes >7 days old, per-friend copy-to-clipboard nudge messages,
       group-total line. Shortcut 7 (Reflect/Faith/Settings → 8/9/0).
       SCHEMA_VERSION = 7: migrate() adds `friends: []` + settings.shareId
+- [x] **Classes database (v0.8):** `classes` array (name, code, color,
+      schedule); tasks carry classId instead of free text; class select in
+      the add-task form; class filter chips with color dots + open counts;
+      inline "＋ class" create form with 6-swatch palette (in DESIGN.md);
+      deleting a class unsets its tasks. SCHEMA_VERSION = 8: migrate()
+      converts distinct task.cls strings into class objects
 
 ## What is NOT done (see docs/ROADMAP.md)
 
-- [ ] Classes as their own database  ← suggested next task
-- [ ] Calendar view / kanban view of assignments
-- [ ] Recurring habit targets (e.g. lift MWF only)
-- [ ] Search, markdown in notes, dark mode
+- [ ] Calendar view / kanban view of assignments  ← next from roadmap
+- [ ] Recurring habit targets (e.g. lift MWF only)  ← in progress this session
+- [ ] Search across tasks
 - [ ] Optional React migration (roadmap phase 3)
 
 ## Conventions future sessions must follow
