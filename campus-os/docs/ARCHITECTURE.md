@@ -346,6 +346,41 @@ focus: [ { id, date:"YYYY-MM-DD", mins, taskId } ]  // one entry per finished se
   recap text ("🎯 Xm of deep work", omitted when 0). `weekRecap()` gained
   `focusMins`.
 
+## v0.14 additions (SCHEMA_VERSION = 11)
+
+**Money view (student budget tracker):**
+
+```js
+money: {
+  budget: 0,                                   // monthly budget in $; 0 = unset
+  txs: [ { id, date:"YYYY-MM-DD", amount,      // amount always positive
+           cat,                                // key of MONEY_CATS ("income" = money in)
+           note } ]
+}
+```
+
+- `migrate()` v10→v11 adds `money: {budget:0, txs:[]}`. Seed ships budget
+  200 + 3 sample txs.
+- `MONEY_CATS` map (food / transport / school / fun / subs / other /
+  income) — label + emoji. Income is just a category; all math treats
+  `cat==="income"` as money in, everything else as spend. Adding a
+  category = one entry in the map.
+- `addTx()` validates amount (`parseFloat > 0`, rounded to cents) and
+  category; junk input is silently ignored. `setBudget()` — 0/invalid
+  clears the budget.
+- `renderMoney()`: 4 stat cards (spent this month / budget — the $ value
+  is an inline `#mBudget` number input, listener re-attached each render —
+  / income + net / top category), budget progress bar (`.money-fill`,
+  capped at 100%, `.over` flips it to the flag gradient), 6-month spending
+  SVG bar chart (own `#moneyGrad` gradient — don't reuse `#barGrad`, it
+  lives in the Progress view's SVG), category filter chips
+  (`moneyCatFilter`), and this month's tx list (delete via `data-txdel`).
+- **Privacy rule:** `weekRecap()` gained `spentWeek` and the recap CARD
+  shows it, but `recapText()` (the copy-for-your-circle share text)
+  deliberately contains no money data. Keep it that way.
+- Nav: Money sits in MAIN after Friends, with **no digit shortcut** (1–0
+  are all taken) — reachable via sidebar or the palette ("Go to Money").
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

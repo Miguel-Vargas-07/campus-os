@@ -14,7 +14,8 @@
 
 ## Version
 
-- **v0.13** — July 15, 2026. Focus timer (schema 10).
+- **v0.14** — July 15, 2026. Money view (schema 11).
+- v0.13 — July 15, 2026. Focus timer (schema 10).
 - v0.12 — July 15, 2026. Command palette (Ctrl+K).
 - v0.11 — July 15, 2026. Assignments views: List / Board / Calendar.
 - v0.10 — July 15, 2026. Weekly recap card.
@@ -28,7 +29,7 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.13)
+## What is DONE (v0.14)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -120,6 +121,14 @@ localStorage + export/import, responsive, seed data), plus:
       view, "End early" logs whole elapsed minutes (<1m logs nothing).
       Sessions in `focus` array; focus minutes in Today hero + weekly
       recap card/copy text. SCHEMA_VERSION = 10: migrate() adds `focus: []`
+- [x] **Money view (v0.14):** from Miguel's notes — expense/income log
+      (amount, emoji category, note, date), monthly budget set inline in
+      its stat card with progress bar (red when over), income/net + top
+      category stats, 6-month spending SVG chart, category filter chips,
+      per-month tx list with delete. Spend-this-week on the recap CARD
+      only — never in the shared recap text (money stays private).
+      No digit shortcut (1–0 taken); sidebar or palette. SCHEMA_VERSION
+      = 11: migrate() adds `money: {budget:0, txs:[]}`
 
 ## What is NOT done (see docs/ROADMAP.md)
 
@@ -137,6 +146,25 @@ localStorage + export/import, responsive, seed data), plus:
 5. After any work session, update this file's DONE/NOT DONE lists and version.
 
 ## Last session summary
+
+Session 8 (July 15, 2026, same sitting as session 7): Miguel's idea notes
+(`docs/CAPMUS-OS NOTES.txt` — filename typo kept at his call: dashboard,
+AI agent, Google services, finances, blog/community) were committed and
+pushed, and the five ideas were triaged into ROADMAP.md. Asked to pick
+and build the best one now, Claude chose **finances** (local-first fit,
+no API key or backend needed, testable today; AI agent stays next-up once
+Miguel has a key) and shipped **v0.14 Money view** (schema 11): expense/
+income log with emoji categories, inline monthly budget with over-budget
+bar, 6-month spending chart, category filters, tx delete. Verified live
+in browser: v10→v11 migration, form adds + junk rejection ($-5, "abc"),
+budget math ($18.49 spent / $81.51 left / 18% bar), over-budget flip
+(capped 100% red bar, "$13.49 over"), category filter, delete, palette
+"Go to Money", fresh-seed shape, zero console errors. Privacy decision:
+spend shows on the recap card but is excluded from the shareable recap
+text. v0.11–v0.13 commits from session 7 were pushed to GitHub this
+session too.
+Next suggested task: **AI helper** (roadmap 7b) once Miguel has an
+Anthropic API key — recap writer / note summarizer are ready surfaces.
 
 Session 7 (July 15, 2026): Miguel asked Claude to take inspiration from
 similar apps and build creatively. Three features, three commits, all

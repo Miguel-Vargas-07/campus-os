@@ -47,7 +47,23 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
     deliberate learning exercise (Miguel has built React POCs before);
     the vanilla version stays as the reference implementation.
 
+## From Miguel's notes (docs/CAPMUS-OS NOTES.txt), triaged July 15 2026
+
+- ~~**Finances**~~ shipped in v0.14 (Money view).
+- **AI agent** — same as roadmap 7b; waiting on Miguel getting an API key.
+- **Dashboard** — mostly covered by Today + Progress; revisit only if a
+  concrete gap shows up.
+- **Google services connection** — parking lot (needs OAuth + Miguel's own
+  credentials; Claude must never handle those).
+- **Blog/community thread area** — needs a backend; rides on the Supabase
+  phase 2.5 decision. Friends circle is the no-backend stand-in.
+
 ## Shipped outside the original plan
+
+- **Money view (v0.14)** — from Miguel's notes: expense/income log with
+  emoji categories, monthly budget + progress bar, 6-month spending chart,
+  top-category stat, spend-this-week on the recap card (never in the
+  shared recap text).
 
 - **Focus timer (v0.13)** — pomodoro-style deep-work sprints (15/25/50m)
   optionally tied to a task; chime on finish; sessions logged (schema 10);
