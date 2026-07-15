@@ -46,6 +46,11 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
 
 ## Shipped outside the original plan
 
+- **Weekly recap card (v0.10)** — week-in-review hero on Progress (tasks
+  vs last week, habit %, best habit, mood, pipeline, reflections) with
+  copy-for-circle text that embeds your friend code; Sunday-evening nudge
+  on Today. Natural surface for the AI helper later (same data, Haiku
+  writes the recap).
 - **Friends / circle leaderboard (v0.7)** — no-backend version via pasted
   "friend codes" (base64 stat snapshots): community leaderboard filterable
   by tasks / habit consistency / pipeline moves / reflection streak,

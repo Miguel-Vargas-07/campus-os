@@ -336,6 +336,19 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
 .lb-row .x:hover{color:var(--flag);opacity:1}
 @media (max-width:820px){ .friends-top{grid-template-columns:1fr} }
 
+/* ---------- Weekly recap ---------- */
+.recap-card{
+  border-radius:var(--r);padding:18px 22px;margin-bottom:16px;color:#fff;
+  background:linear-gradient(120deg,var(--pine) 0%,var(--pine-2) 55%,#245139 100%);
+  box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+}
+.rc-label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--pine-text);font-weight:600;margin-bottom:8px}
+.rc-lines{display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px}
+.rc-lines b{color:#5FC98F}
+.rc-delta{font-family:var(--mono);font-size:10.5px;color:var(--pine-text)}
+.rc-copy{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.rc-copy:hover{border-color:#5FC98F;color:#5FC98F;transform:none}
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -397,6 +410,7 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
         <h3>Today's habits</h3>
         <div id="todayHabits"></div>
         <button class="nudge" id="reflectNudge" style="display:none">🌙 You haven't reflected today — takes two minutes.</button>
+        <button class="nudge" id="recapNudge" style="display:none">🗓 Sunday wrap-up — your week in review is ready.</button>
       </div>
     </div>
   </section>
@@ -442,6 +456,7 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
         <button data-p="yearly">Yearly</button>
       </div>
     </div>
+    <div class="recap-card" id="recapCard"></div>
     <div class="stats" id="progStats"></div>
     <div class="card" style="padding:20px 22px 14px">
       <h3 style="font-size:15px;margin-bottom:4px" id="progChartTitle"></h3>
@@ -1074,6 +1089,7 @@ function renderToday(){
       : `<div class="empty">No habits yet — add some in the Habits tab.</div>`;
 
   $("#reflectNudge").style.display = (h>=17 && !todayReflection()) ? "block" : "none";
+  $("#recapNudge").style.display = (now.getDay()===0 && h>=17) ? "block" : "none";
 }
 
 function renderTasks(){
@@ -1446,7 +1462,59 @@ function progBuckets(period){
   return B;
 }
 
+function weekRecap(){
+  const now = new Date(), td = todayStr();
+  const mon = mondayOf(now), monS = dateStr(mon);
+  const prevMon = new Date(mon); prevMon.setDate(mon.getDate()-7);
+  const prevSun = new Date(mon); prevSun.setDate(mon.getDate()-1);
+  const doneIn = (a,b)=>state.tasks.filter(t=>t.status==="done"&&t.completed&&t.completed>=a&&t.completed<=b).length;
+  const tasksNow = doneIn(monS, td), tasksPrev = doneIn(dateStr(prevMon), dateStr(prevSun));
+  let hits=0, cells=0, best=null, bestN=0;
+  state.habits.forEach(h=>{
+    let n=0;
+    for(let d=new Date(mon); dateStr(d)<=td; d.setDate(d.getDate()+1)){
+      if(habitDue(h,d)){ cells++; if(h.log[dateStr(d)]) hits++; }
+      if(h.log[dateStr(d)]) n++;
+    }
+    if(n>bestN){ bestN=n; best=h.name; }
+  });
+  const habitPct = cells ? Math.round(hits/cells*100) : 0;
+  const moods = state.reflections.filter(r=>r.date>=monS && r.date<=td && r.mood).map(r=>r.mood);
+  const avgMood = moods.length ? Math.round(moods.reduce((a,b)=>a+b,0)/moods.length) : 0;
+  const appsWeek = state.apps.filter(a=>a.updated && a.updated>=monS).length;
+  const refDays = state.reflections.filter(r=>r.date>=monS && r.date<=td).length;
+  return {monS, td, tasksNow, tasksPrev, habitPct, best, bestN, avgMood, appsWeek, refDays};
+}
+function recapText(){
+  const r = weekRecap();
+  const delta = r.tasksNow - r.tasksPrev;
+  const lines = [
+    `📒 my Campus OS week (${fmtDue(r.monS)} – ${fmtDue(r.td)})`,
+    `✅ ${r.tasksNow} task${r.tasksNow!==1?"s":""} done (${delta>=0?"▲":"▼"}${Math.abs(delta)} vs last week)`,
+    `🔁 habits ${r.habitPct}% on target${r.best?` — best: ${r.best} ×${r.bestN}`:""}`,
+    `🚀 ${r.appsWeek} internship move${r.appsWeek!==1?"s":""}`,
+    `🌙 reflected ${r.refDays} day${r.refDays!==1?"s":""}`
+  ];
+  return lines.join("\n") + `\n\nadd me on Campus OS: ${myShareCode()}`;
+}
+function renderRecap(){
+  const r = weekRecap();
+  const delta = r.tasksNow - r.tasksPrev;
+  $("#recapCard").innerHTML = `
+    <div>
+      <div class="rc-label">WEEK IN REVIEW · ${fmtDue(r.monS).toUpperCase()} – ${fmtDue(r.td).toUpperCase()}</div>
+      <div class="rc-lines">
+        <span>✅ <b>${r.tasksNow}</b> done <span class="rc-delta">${delta>=0?"▲":"▼"}${Math.abs(delta)} vs last wk</span></span>
+        <span>🔁 <b>${r.habitPct}%</b> on target${r.best?` · best: ${esc(r.best)} ×${r.bestN}`:""}</span>
+        <span>🚀 <b>${r.appsWeek}</b> pipeline move${r.appsWeek!==1?"s":""}</span>
+        <span>🌙 <b>${r.refDays}</b> reflection${r.refDays!==1?"s":""}${r.avgMood?` · avg mood ${MOODS[r.avgMood-1]}`:""}</span>
+      </div>
+    </div>
+    <button class="btn rc-copy" id="recapCopy">Copy recap for your circle</button>`;
+  $("#recapCopy").addEventListener("click",e=>copyText(recapText(), e.target, "Copied — send it!"));
+}
 function renderProgress(){
+  renderRecap();
   const B = progBuckets(progPeriod);
   const doneDates = state.tasks.filter(t=>t.status==="done"&&t.completed).map(t=>t.completed);
   const counts = B.map(b=>doneDates.filter(b.test).length);
@@ -1607,6 +1675,7 @@ $("#quickInput").addEventListener("keydown",e=>{
   if(e.key==="Enter" && e.target.value.trim()){ addTask(e.target.value,"","","med"); e.target.value=""; }
 });
 $("#reflectNudge").addEventListener("click",()=>switchView("reflect"));
+$("#recapNudge").addEventListener("click",()=>switchView("progress"));
 $("#tAdd").addEventListener("click",()=>{
   addTask($("#tTitle").value, $("#tClass").value, $("#tDue").value, $("#tPriority").value);
   $("#tTitle").value=""; $("#tDue").value="";

@@ -14,7 +14,8 @@
 
 ## Version
 
-- **v0.9** — July 15, 2026. Recurring habit targets.
+- **v0.10** — July 15, 2026. Weekly recap card.
+- v0.9 — July 15, 2026. Recurring habit targets.
 - v0.8 — July 15, 2026. Classes database.
 - v0.7 — July 15, 2026. Friends circle + leaderboard (friend codes).
 - v0.6 — July 15, 2026. Internship application tracker (kanban).
@@ -24,7 +25,7 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.9)
+## What is DONE (v0.10)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -94,6 +95,11 @@ localStorage + export/import, responsive, seed data), plus:
       off-day cells dashed but clickable; Today lists only due habits with
       rest-day empty state; friends habit % counts scheduled days only.
       SCHEMA_VERSION = 9
+- [x] **Weekly recap card (v0.10):** week-in-review hero on Progress
+      (weekRecap(): tasks done + delta vs last week, habit % on target,
+      best habit, avg mood, pipeline moves, reflection days); "Copy recap
+      for your circle" text ends with your friend code; Sunday-evening
+      nudge on Today. Pure derived data — schema unchanged (still 9)
 
 ## What is NOT done (see docs/ROADMAP.md)
 
@@ -125,9 +131,14 @@ community feel rather than first-vs-last (tasks-this-week is the default
 metric). Both versions verified in browser (migrations v5→v6→v7, code
 round-trip, self/garbage code rejection, re-paste refresh, stale chip,
 nudge clipboard, dark + light schemes). Docs updated each time.
+Later the same session, Miguel picked three features over AI integration
+(for now), built as three separate commits: **classes database** (v0.8),
+**recurring habit targets** (v0.9), **weekly recap card** (v0.10). All
+verified in browser; migrations chain v5→…→9 cleanly.
 AI-helper plan of record from session 5 unchanged (own API key, Haiku 4.5,
-personal use only). Login decision stands: local-first; Supabase phase 2.5
-if sync is ever wanted — the friend-code snapshot shape was designed to
-become the Supabase sync payload if that day comes.
-Next suggested task: **classes database** (roadmap #2), or the AI helper if
+personal use only) — the weekly recap is the natural first AI surface.
+Login decision stands: local-first; Supabase phase 2.5 if sync is ever
+wanted — the friend-code snapshot shape was designed to become the
+Supabase sync payload if that day comes.
+Next suggested task: **calendar view** (roadmap #3), or the AI helper if
 Miguel gets an API key.

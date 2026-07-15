@@ -267,6 +267,22 @@ classes: [ { id, name, code, color, schedule } ]  // color ∈ CLASS_COLORS
 - Friends metric `hp` (habit consistency) now counts only due cells over
   the last 7 days — fairer for scheduled habits.
 
+## v0.10 additions (no schema change)
+
+**Weekly recap card:**
+
+- Pure derived data — `weekRecap()` computes Mon→today vs the full previous
+  week: tasks done (+delta), habit % on target (due cells only), best habit
+  by hits, avg mood, pipeline moves (`apps.updated >= Monday`), reflection
+  days. No state added, nothing to migrate.
+- `renderRecap()` draws a pine-gradient hero (`.recap-card`) at the top of
+  the Progress view, called from `renderProgress()`.
+- "Copy recap for your circle" → `recapText()` builds a plain-text summary
+  ending with the sender's current friend code (so receivers can add/refresh
+  them in one paste), copied via the existing `copyText()`.
+- Sunday-evening nudge on Today (`#recapNudge`, `getDay()===0 && h>=17`)
+  jumps to Progress — same pattern as the reflect nudge.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the
