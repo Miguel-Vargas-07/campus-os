@@ -4,6 +4,17 @@
 > this is the single source of truth for where the project stands. Read this,
 > then `docs/ARCHITECTURE.md` and `docs/ROADMAP.md`, before writing any code.
 
+## Deployment
+
+- **Live:** https://miguel-vargas-07.github.io/campus-os/ — GitHub Pages,
+  served from `main` branch root. Repo is now **PUBLIC** (was private; free
+  plan can't do Pages on private repos — Miguel approved going public
+  July 15, 2026). A root `index.html` redirects to `campus-os/app/index.html`
+  (the app sits one folder deep, so the bare Pages URL needs the bounce).
+- localStorage is still per-device; hosting doesn't add sync. Export/import
+  and friend codes remain the portability story. This unblocks the PWA
+  roadmap item (manifest + service worker + installable to home screen).
+
 ## Owner & intent
 
 - **Owner:** Miguel — CS freshman, busy schedule (classes, internship,

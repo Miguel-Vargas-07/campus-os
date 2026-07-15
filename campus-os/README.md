@@ -6,7 +6,9 @@ blocks — all in one local app with zero dependencies.
 
 ## Quick start
 
-1. Open `app/index.html` in any browser (double-click it). That's the whole app.
+**Live app:** https://miguel-vargas-07.github.io/campus-os/ (hosted on GitHub Pages)
+
+1. Or open `app/index.html` in any browser (double-click it). That's the whole app.
 2. Your data saves automatically to your browser's localStorage.
 3. Use **Export** (in Settings) regularly to save a JSON backup of your data.
    **Import** restores it on any machine or after clearing your browser.
