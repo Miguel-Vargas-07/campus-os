@@ -84,6 +84,40 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
   nudges) would ride on the Supabase phase 2.5 plan; the snapshot shape is
   designed to become the sync payload.
 
+## Feature research — what makes competing apps win (July 15, 2026)
+
+Claude researched the app categories Campus OS touches (student planners,
+habit trackers, daily planners, study tools, job trackers) and identified
+the five highest-value additions, ranked. Evidence and reasoning live in
+the session notes; short version:
+
+1. **Schedule-aware Today / "Plan my day"** (Structured, Shovel, Sunsama,
+   MyStudyLife) — render today's classes as a timeline, drag tasks/focus
+   blocks into free gaps, show free-time budget. The daily planning ritual
+   is the #1 retention loop in this category; classes already store a
+   schedule string the app never uses.
+2. **Spaced-repetition flashcards from notes** (Anki) — Q/A cards written
+   in notes (`Q:`/`A:` or #flashcard), SM-2-lite scheduler, "cards due"
+   on Today. Retrieval practice beats rereading by ~50% in studies; no
+   competitor combines planner + notes + SRS in one local app. Natural
+   surface for the AI helper later (auto-generate cards).
+3. **Natural-language quick add** (Todoist) — parse "PS4 due fri #cs101
+   !high" in quick-add and the palette. Capture friction is the top
+   reason task systems get abandoned.
+4. **PWA install + reminders** (Duolingo, every mobile-first app) — web
+   manifest + service worker + optional local notifications; requires
+   hosting (GitHub Pages — repo already exists). Home-screen presence is
+   the difference between a demo and a daily driver; installability alone
+   showed 150–450% retention lifts in published case studies.
+5. **Grade tracking + "what do I need on the final"** (MyStudyLife, every
+   grade-calculator site) — per-class syllabus weights + scores → current
+   grade + what-if calculator. Classic student hook; classes DB already
+   exists; spikes in usefulness exactly at midterms/finals.
+
+Honorable mention: guided **weekly review** (GTD/Things 3) — extend the
+Sunday recap nudge into a short review flow (archive stale, roll over,
+plan next week). Cheap and pairs with #1.
+
 ## Parking lot (maybe never)
 
 - Shared pages (would need a backend — big scope jump)
