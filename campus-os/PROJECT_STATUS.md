@@ -14,7 +14,8 @@
 
 ## Version
 
-- **v0.8** — July 15, 2026. Classes database.
+- **v0.9** — July 15, 2026. Recurring habit targets.
+- v0.8 — July 15, 2026. Classes database.
 - v0.7 — July 15, 2026. Friends circle + leaderboard (friend codes).
 - v0.6 — July 15, 2026. Internship application tracker (kanban).
 - v0.5 — July 14, 2026. Obsidian-style notes + color scheme gallery.
@@ -23,7 +24,7 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.8)
+## What is DONE (v0.9)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -87,11 +88,16 @@ localStorage + export/import, responsive, seed data), plus:
       inline "＋ class" create form with 6-swatch palette (in DESIGN.md);
       deleting a class unsets its tasks. SCHEMA_VERSION = 8: migrate()
       converts distinct task.cls strings into class objects
+- [x] **Recurring habit targets (v0.9):** habit.days (null = daily, else
+      day indexes, 0 = Mon); schedule chip per habit opens 7-day toggle
+      editor; streaks skip rest days (missed target days still break);
+      off-day cells dashed but clickable; Today lists only due habits with
+      rest-day empty state; friends habit % counts scheduled days only.
+      SCHEMA_VERSION = 9
 
 ## What is NOT done (see docs/ROADMAP.md)
 
 - [ ] Calendar view / kanban view of assignments  ← next from roadmap
-- [ ] Recurring habit targets (e.g. lift MWF only)  ← in progress this session
 - [ ] Search across tasks
 - [ ] Optional React migration (roadmap phase 3)
 

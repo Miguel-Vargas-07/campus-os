@@ -175,6 +175,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .cell:disabled{opacity:.3;cursor:default}
 .habit-del{border:0;background:none;color:var(--ink-soft);opacity:.45;font-size:14px}
 .habit-del:hover{color:var(--flag);opacity:1}
+.cell.off{border-style:dashed;opacity:.35}
+.cell.off.hit{opacity:.75}
+.sched-chip{border:1px solid var(--line);background:var(--paper);border-radius:999px;font-family:var(--mono);font-size:9.5px;font-weight:600;padding:2px 8px;color:var(--ink-soft);margin-left:8px;letter-spacing:.06em;vertical-align:middle}
+.sched-chip:hover{border-color:var(--green);color:var(--green)}
+.sched-row td{background:var(--paper);text-align:left}
+.sched-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink-soft);font-weight:600;margin-right:10px}
+.day-tgl{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--ink-soft);margin-right:3px}
+.day-tgl.on{background:linear-gradient(135deg,var(--green),var(--green-deep));color:#fff;border-color:transparent}
 
 /* ---------- Notes ---------- */
 .notes-layout{display:grid;grid-template-columns:255px 1fr;gap:16px;align-items:start}
@@ -593,7 +601,7 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -648,9 +656,9 @@ function seed(){
       {id:uid(),title:"Plan Saturday with Vic",classId:cLife.id,due:plus(4),priority:"low",status:"todo",created:new Date().toISOString()}
     ],
     habits: [
-      {id:uid(),name:"Workout",log:{}},
-      {id:uid(),name:"LeetCode (1 problem)",log:{}},
-      {id:uid(),name:"Sleep by midnight",log:{}}
+      {id:uid(),name:"Workout",log:{},days:[0,2,4]},
+      {id:uid(),name:"LeetCode (1 problem)",log:{},days:[0,1,2,3,4]},
+      {id:uid(),name:"Sleep by midnight",log:{},days:null}
     ],
     notes: [
       {id:uid(),title:"Welcome to Campus OS",updated:new Date().toISOString(),
@@ -728,6 +736,11 @@ function migrate(data){
     });
     data.schema = 8;
   }
+  if(data.schema === 8){
+    // v9: habits get target days (null = every day)
+    data.habits.forEach(h=>{ if(!Array.isArray(h.days) || !h.days.length) h.days = null; });
+    data.schema = 9;
+  }
   return data;
 }
 
@@ -794,10 +807,30 @@ function deleteHabit(id){
   if(!confirm("Delete this habit and its history?")) return;
   state.habits = state.habits.filter(h=>h.id!==id); save(); render();
 }
+const DAY_LETTERS = ["M","T","W","T","F","S","S"]; // index 0 = Monday
+function habitDays(h){ return (Array.isArray(h.days) && h.days.length) ? h.days : null; }
+function habitDue(h, d){ const hd = habitDays(h); return !hd || hd.includes((d.getDay()+6)%7); }
+function schedLabel(h){
+  const hd = habitDays(h);
+  return hd ? hd.slice().sort((a,b)=>a-b).map(i=>DAY_LETTERS[i]).join("") : "daily";
+}
+function toggleHabitDay(id, i){
+  const h = state.habits.find(h=>h.id===id); if(!h) return;
+  let hd = habitDays(h) || [0,1,2,3,4,5,6];
+  hd = hd.includes(i) ? hd.filter(x=>x!==i) : [...hd, i];
+  h.days = (hd.length===0 || hd.length===7) ? null : hd.sort((a,b)=>a-b);
+  save(); render();
+}
 function streak(h){
+  // counts consecutive TARGET days hit; rest days are skipped, not broken
   let n = 0; const d = new Date();
-  if(!h.log[dateStr(d)]) d.setDate(d.getDate()-1);
-  while(h.log[dateStr(d)]){ n++; d.setDate(d.getDate()-1); }
+  if(habitDue(h,d) && !h.log[dateStr(d)]) d.setDate(d.getDate()-1); // today still open
+  for(let i=0;i<3650;i++){
+    if(habitDue(h,d)){
+      if(h.log[dateStr(d)]) n++; else break;
+    }
+    d.setDate(d.getDate()-1);
+  }
   return n;
 }
 
@@ -922,7 +955,7 @@ function myStats(){
   let hits=0, cells=0;
   for(let i=6;i>=0;i--){
     const d=new Date(); d.setDate(d.getDate()-i); const ds=dateStr(d);
-    state.habits.forEach(h=>{ cells++; if(h.log[ds]) hits++; });
+    state.habits.forEach(h=>{ if(habitDue(h,d)){ cells++; if(h.log[ds]) hits++; } });
   }
   const hp = cells ? Math.round(hits/cells*100) : 0;
   const a = state.apps.filter(x=>x.updated && x.updated>=mon).length;
@@ -1015,10 +1048,11 @@ function renderToday(){
   const open = state.tasks.filter(t=>t.status!=="done");
   const overdue = open.filter(t=>t.due && t.due<todayStr()).length;
   const td = todayStr();
-  const habitsDone = state.habits.filter(hb=>hb.log[td]).length;
+  const dueHabits = state.habits.filter(hb=>habitDue(hb, now));
+  const habitsDone = dueHabits.filter(hb=>hb.log[td]).length;
   $("#gStats").innerHTML =
     `<b>${open.length}</b> open task${open.length!==1?"s":""}${overdue?` · <b style="color:#F1A583">${overdue}</b> overdue`:""}<br>` +
-    `habits today <b>${habitsDone}/${state.habits.length}</b>`;
+    `habits today <b>${habitsDone}/${dueHabits.length}</b>`;
 
   const horizon = new Date(now); horizon.setDate(now.getDate()+7);
   const due = state.tasks
@@ -1028,14 +1062,16 @@ function renderToday(){
     ? due.map(taskRow).join("")
     : `<div class="empty">Nothing due this week. Go touch grass 🌱</div>`;
 
-  $("#todayHabits").innerHTML = state.habits.length
-    ? state.habits.map(hb=>`
+  $("#todayHabits").innerHTML = dueHabits.length
+    ? dueHabits.map(hb=>`
       <label class="habit-check">
         <input type="checkbox" data-habit-today="${hb.id}" ${hb.log[td]?"checked":""}>
         <span>${esc(hb.name)}</span>
         ${streak(hb)>1?`<span class="streak">×${streak(hb)}</span>`:""}
       </label>`).join("")
-    : `<div class="empty">No habits yet — add some in the Habits tab.</div>`;
+    : state.habits.length
+      ? `<div class="empty">Rest day — nothing scheduled today 🌿</div>`
+      : `<div class="empty">No habits yet — add some in the Habits tab.</div>`;
 
   $("#reflectNudge").style.display = (h>=17 && !todayReflection()) ? "block" : "none";
 }
@@ -1072,23 +1108,35 @@ function renderTasks(){
   $("#taskList").innerHTML = list.length ? list.map(taskRow).join("") : `<div class="empty">No tasks here.</div>`;
 }
 
+let schedEditing = null;
 function renderHabits(){
   const days = weekDates(), td = todayStr();
   $("#weekRange").textContent =
     `Week ${weekNum()} · ${days[0].toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${days[6].toLocaleDateString(undefined,{month:"short",day:"numeric"})}`;
   const head = `<tr><th>Habit</th>${["MON","TUE","WED","THU","FRI","SAT","SUN"].map((d,i)=>
     `<th${dateStr(days[i])===td?' style="color:var(--green)"':''}>${d}</th>`).join("")}<th>STREAK</th><th></th></tr>`;
-  const rows = state.habits.map(hb=>`<tr>
-    <td>${esc(hb.name)}</td>
-    ${days.map(d=>{
-      const ds = dateStr(d), future = ds > td;
-      return `<td><button class="cell ${hb.log[ds]?"hit":""} ${ds===td?"today-cell":""}"
+  const rows = state.habits.map(hb=>{
+    const row = `<tr>
+    <td>${esc(hb.name)} <button class="sched-chip" data-hsched="${hb.id}" title="Edit target days">${schedLabel(hb)}</button></td>
+    ${days.map((d,i)=>{
+      const ds = dateStr(d), future = ds > td, off = !habitDue(hb, d);
+      return `<td><button class="cell ${hb.log[ds]?"hit":""} ${ds===td?"today-cell":""} ${off?"off":""}"
         data-toggle="${hb.id}" data-day="${ds}" ${future?"disabled":""}
-        aria-label="${esc(hb.name)} ${ds}"></button></td>`;
+        aria-label="${esc(hb.name)} ${ds}${off?" (rest day)":""}"></button></td>`;
     }).join("")}
     <td class="streak">${streak(hb)||"—"}</td>
     <td><button class="habit-del" data-hdel="${hb.id}" title="Delete habit">✕</button></td>
-  </tr>`).join("");
+  </tr>`;
+    const editor = schedEditing===hb.id ? `<tr class="sched-row"><td colspan="10">
+      <span class="sched-label">TARGET DAYS</span>
+      ${DAY_LETTERS.map((L,i)=>{
+        const on = !habitDays(hb) || habitDays(hb).includes(i);
+        return `<button class="day-tgl ${on?"on":""}" data-hday="${hb.id}" data-di="${i}">${L}</button>`;
+      }).join("")}
+      <span class="hint" style="margin:0 0 0 10px">Streaks only count target days — rest days don't break them.</span>
+    </td></tr>` : "";
+    return row + editor;
+  }).join("");
   $("#habitTable").innerHTML = head + (rows || `<tr><td colspan="10" class="empty">Add your first habit above.</td></tr>`);
 }
 
@@ -1529,6 +1577,8 @@ document.body.addEventListener("click",e=>{
   const del = e.target.closest("[data-del]");   if(del) return deleteTask(del.dataset.del);
   const tog = e.target.closest("[data-toggle]");if(tog) return toggleHabit(tog.dataset.toggle, tog.dataset.day);
   const hdl = e.target.closest("[data-hdel]");  if(hdl) return deleteHabit(hdl.dataset.hdel);
+  const hsc = e.target.closest("[data-hsched]");if(hsc){ schedEditing = schedEditing===hsc.dataset.hsched ? null : hsc.dataset.hsched; renderHabits(); return; }
+  const hdy = e.target.closest("[data-hday]");  if(hdy) return toggleHabitDay(hdy.dataset.hday, Number(hdy.dataset.di));
   const nt  = e.target.closest("[data-note]");  if(nt){ selectedNote = nt.dataset.note; return renderNotes(); }
   const rd  = e.target.closest("[data-rdel]");  if(rd) return deleteReflection(rd.dataset.rdel);
   const pa  = e.target.closest("[data-pans]");  if(pa) return answerPrayer(pa.dataset.pans);

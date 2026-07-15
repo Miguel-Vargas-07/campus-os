@@ -246,6 +246,27 @@ classes: [ { id, name, code, color, schedule } ]  // color ∈ CLASS_COLORS
 - `classById(id)` helper; `taskRow()` renders a colored `.dot` + class name.
 - CLASS_COLORS palette documented in DESIGN.md — dots/swatches only.
 
+## v0.9 additions (SCHEMA_VERSION = 9)
+
+**Recurring habit targets:**
+
+- `habit.days` — `null` (every day, the default) or an array of day indexes
+  where **0 = Monday** (matches `weekDates()`); normalized: empty or full
+  arrays collapse to `null`. `migrate()` v8→v9 adds `days: null`.
+- Helpers: `habitDays(h)` (normalized), `habitDue(h, date)`,
+  `schedLabel(h)` ("MWF" / "daily"), `DAY_LETTERS` (Mon-first).
+- `streak(h)` rewritten: walks back skipping non-target days — rest days
+  never break a streak, missed target days do. Today-still-open rule kept.
+  Iteration-capped at 3650.
+- Habits view: schedule chip next to each name toggles an inline editor row
+  (`schedEditing` state) with 7 day toggles. Off-day cells render dashed at
+  35% (`.cell.off`) but stay clickable (bonus logging allowed; doesn't
+  affect streaks).
+- Today view lists only habits due today (`habitDue`), shows a rest-day
+  empty state, and the hero counts x/due.
+- Friends metric `hp` (habit consistency) now counts only due cells over
+  the last 7 days — fairer for scheduled habits.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

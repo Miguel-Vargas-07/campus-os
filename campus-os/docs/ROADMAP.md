@@ -14,8 +14,8 @@ Claude session comfortably.
 3. **Calendar view** ← NEXT — month grid rendering tasks by due date.
 4. **Kanban view for assignments** — status columns with click-to-advance
    (data model already supports it).
-5. **Recurring habits config** — per-habit target days (e.g., lift MWF),
-   so streaks don't break on rest days.
+5. ~~**Recurring habits config**~~ shipped in v0.9 — per-habit target days
+   (habit.days, 0=Mon), streaks skip rest days, Today shows only due habits.
 
 ## Phase 2 — polish
 
