@@ -349,6 +349,30 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
 .rc-copy{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
 .rc-copy:hover{border-color:#5FC98F;color:#5FC98F;transform:none}
 
+/* ---------- Assignments: board & calendar ---------- */
+.kanban.k3{grid-template-columns:repeat(3,minmax(150px,1fr))}
+.cal-head{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.cal-title{font-family:var(--disp);font-weight:700;font-size:16px;min-width:132px}
+.cal-nav{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--ink-soft)}
+.cal-nav:hover{border-color:var(--green);color:var(--green)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-dow{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink-soft);text-align:center;padding:9px 0;border-bottom:1px solid var(--line);font-weight:600}
+.cal-cell{min-height:96px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:var(--card);cursor:pointer;overflow:hidden;min-width:0}
+.cal-cell:nth-child(7n){border-right:0}
+.cal-cell:hover{background:var(--paper)}
+.cal-cell.out{background:var(--paper);opacity:.55}
+.cal-cell.today .cal-num{background:var(--green);color:#fff;border-radius:999px}
+.cal-num{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-bottom:4px;display:inline-block;padding:1px 6px}
+.cal-pill{display:block;width:100%;text-align:left;border:0;background:var(--green-soft);color:var(--ink);border-radius:6px;font-size:10.5px;padding:2px 6px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.5}
+.cal-pill:hover{filter:brightness(.95)}
+.cal-pill .dot{width:6px;height:6px;margin-right:2px}
+.cal-pill.done{text-decoration:line-through;opacity:.5}
+.cal-pill.over{background:#FBEFE8;color:var(--flag)}
+.cal-pill.app{background:var(--gold-soft);color:#8A6E12}
+.cal-more{font-family:var(--mono);font-size:9.5px;color:var(--ink-soft);padding:0 6px}
+html[data-theme="dark"] .cal-pill.over{background:#332014}
+html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -418,7 +442,12 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
   <!-- ASSIGNMENTS -->
   <section class="view" id="view-tasks">
     <div class="view-head">
-      <div><div class="eyebrow">DATABASE</div><h1>Assignments</h1><div class="subtitle">Everything with a deadline, in one table.</div></div>
+      <div><div class="eyebrow">DATABASE</div><h1>Assignments</h1><div class="subtitle">One database, three lenses — list, board, calendar.</div></div>
+      <div class="filters" id="taskViewTabs" style="margin:0">
+        <button data-tv="list" class="on">☰ List</button>
+        <button data-tv="board">▦ Board</button>
+        <button data-tv="cal">🗓 Calendar</button>
+      </div>
     </div>
     <div class="form-row">
       <input type="text" id="tTitle" placeholder="Assignment or task title">
@@ -442,7 +471,9 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
       <button data-f="doing">Doing</button><button data-f="done">Done</button>
     </div>
     <div class="card" id="taskList"></div>
-    <div class="hint">Click a status chip to advance it: TODO → DOING → DONE → TODO</div>
+    <div class="kanban k3" id="taskBoard" style="display:none"></div>
+    <div class="card" id="taskCal" style="display:none;overflow:hidden"></div>
+    <div class="hint" id="taskHint">Click a status chip to advance it: TODO → DOING → DONE → TODO</div>
   </section>
 
   <!-- PROGRESS -->
@@ -1034,6 +1065,8 @@ function nudgeFriend(id, btn){
 let activeView = "today";
 let taskFilter = "all";
 let taskClassFilter = "all";
+let taskView = "list";   // "list" | "board" | "cal"
+let calOffset = 0;       // months away from the current month
 
 function statusChip(t){
   return `<button class="status-btn" data-cycle="${t.id}" title="Click to advance">
@@ -1113,6 +1146,20 @@ function renderTasks(){
   $("#cColors").innerHTML = CLASS_COLORS.map(col=>
     `<button class="swc ${newClassColor===col?"on":""}" data-ccolor="${col}" style="background:${col}" aria-label="class color"></button>`).join("");
 
+  // view tabs + container visibility
+  document.querySelectorAll("#taskViewTabs button").forEach(b=>b.classList.toggle("on", b.dataset.tv===taskView));
+  $("#taskFilters").style.display = taskView==="list" ? "" : "none";
+  $("#taskList").style.display  = taskView==="list"  ? "" : "none";
+  $("#taskBoard").style.display = taskView==="board" ? "" : "none";
+  $("#taskCal").style.display   = taskView==="cal"   ? "" : "none";
+  $("#taskHint").textContent = {
+    list:  "Click a status chip to advance it: TODO → DOING → DONE → TODO",
+    board: "Click a card to advance it to the next column. ✕ deletes.",
+    cal:   "Click a task pill to advance its status. Click an empty day to start a task due that day. 🚀 = internship deadline."
+  }[taskView];
+  if(taskView==="board") return renderTaskBoard();
+  if(taskView==="cal")   return renderTaskCal();
+
   const list = state.tasks
     .filter(t=>taskFilter==="all"||t.status===taskFilter)
     .filter(t=>taskClassFilter==="all"||t.classId===taskClassFilter)
@@ -1122,6 +1169,80 @@ function renderTasks(){
       return (a.due||"9999").localeCompare(b.due||"9999");
     });
   $("#taskList").innerHTML = list.length ? list.map(taskRow).join("") : `<div class="empty">No tasks here.</div>`;
+}
+
+const TASK_COLS = ["todo","doing","done"];
+function renderTaskBoard(){
+  const td = todayStr();
+  const base = state.tasks.filter(t=>taskClassFilter==="all"||t.classId===taskClassFilter);
+  const card = t=>{
+    const c = classById(t.classId);
+    const overdue = t.due && t.due<td && t.status!=="done";
+    return `<div class="kb-card" data-cycle="${t.id}" title="Click to move to the next column">
+      <div class="kb-company" style="${t.status==="done"?"text-decoration:line-through;opacity:.6":""}">${esc(t.title)}</div>
+      <div class="kb-meta">
+        ${c?`<span class="t-cls"><span class="dot" style="background:${c.color}"></span> ${esc(c.code||c.name)}</span>`:""}
+        ${priChip(t.priority)}
+        ${t.due?(overdue?`<span class="chip overdue">${fmtDue(t.due)}</span>`:`<span class="chip todo">${fmtDue(t.due)}</span>`):""}
+        <button class="x" data-del="${t.id}" title="Delete" style="margin-left:auto">✕</button>
+      </div>
+    </div>`;
+  };
+  $("#taskBoard").innerHTML = TASK_COLS.map(s=>{
+    const list = base.filter(t=>t.status===s).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+    return `<div class="kb-col">
+      <div class="kb-head"><span>${s.toUpperCase()}</span><span class="kb-count">${list.length||""}</span></div>
+      ${list.length ? list.map(card).join("") : `<div class="kb-empty">—</div>`}
+    </div>`;
+  }).join("");
+}
+
+function renderTaskCal(){
+  const now = new Date();
+  const anchor = new Date(now.getFullYear(), now.getMonth()+calOffset, 1);
+  const y = anchor.getFullYear(), m = anchor.getMonth();
+  const firstDow = (anchor.getDay()+6)%7; // Mon = 0
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const weeks = Math.ceil((firstDow+daysInMonth)/7);
+  const start = new Date(y, m, 1-firstDow);
+  const td = todayStr();
+  const base = state.tasks.filter(t=>taskClassFilter==="all"||t.classId===taskClassFilter);
+  const byDue = {};
+  base.forEach(t=>{ if(t.due) (byDue[t.due]=byDue[t.due]||[]).push(t); });
+  const appsBy = {};
+  state.apps.forEach(a=>{ if(a.deadline && a.status!=="offer" && a.status!=="rejected") (appsBy[a.deadline]=appsBy[a.deadline]||[]).push(a); });
+
+  let cells = "";
+  for(let i=0;i<weeks*7;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const ds = dateStr(d), out = d.getMonth()!==m;
+    const tasks = (byDue[ds]||[]).slice().sort((a,b)=>(a.status==="done")-(b.status==="done"));
+    const items = [
+      ...tasks.map(t=>{
+        const c = classById(t.classId);
+        const over = ds<td && t.status!=="done";
+        return `<button class="cal-pill ${t.status==="done"?"done":over?"over":""}" data-cycle="${t.id}"
+          title="${esc(t.title)} — click to advance">${c?`<span class="dot" style="background:${c.color}"></span> `:""}${esc(t.title)}</button>`;
+      }),
+      ...(appsBy[ds]||[]).map(a=>`<button class="cal-pill app" data-calapp="${a.id}" title="${esc(a.company)} — application deadline">🚀 ${esc(a.company)}</button>`)
+    ];
+    cells += `<div class="cal-cell ${out?"out":""} ${ds===td?"today":""}" data-calday="${ds}" title="Add a task due ${fmtDue(ds)}">
+      <span class="cal-num">${d.getDate()}</span>
+      ${items.slice(0,3).join("")}
+      ${items.length>3?`<div class="cal-more">+${items.length-3} more</div>`:""}
+    </div>`;
+  }
+  $("#taskCal").innerHTML = `
+    <div class="cal-head">
+      <span class="cal-title">${anchor.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</span>
+      <button class="cal-nav" data-calnav="-1" title="Previous month">◀</button>
+      <button class="cal-nav" data-calnav="0">Today</button>
+      <button class="cal-nav" data-calnav="1" title="Next month">▶</button>
+    </div>
+    <div class="cal-grid">
+      ${["MON","TUE","WED","THU","FRI","SAT","SUN"].map(d=>`<div class="cal-dow">${d}</div>`).join("")}
+      ${cells}
+    </div>`;
 }
 
 let schedEditing = null;
@@ -1641,8 +1762,8 @@ document.addEventListener("keydown",e=>{
   if(map[e.key]) switchView(map[e.key]);
 });
 document.body.addEventListener("click",e=>{
+  const del = e.target.closest("[data-del]");   if(del) return deleteTask(del.dataset.del); // before data-cycle: board/cal cards nest ✕ inside the cycle target
   const cyc = e.target.closest("[data-cycle]"); if(cyc) return cycleStatus(cyc.dataset.cycle);
-  const del = e.target.closest("[data-del]");   if(del) return deleteTask(del.dataset.del);
   const tog = e.target.closest("[data-toggle]");if(tog) return toggleHabit(tog.dataset.toggle, tog.dataset.day);
   const hdl = e.target.closest("[data-hdel]");  if(hdl) return deleteHabit(hdl.dataset.hdel);
   const hsc = e.target.closest("[data-hsched]");if(hsc){ schedEditing = schedEditing===hsc.dataset.hsched ? null : hsc.dataset.hsched; renderHabits(); return; }
@@ -1663,6 +1784,10 @@ document.body.addEventListener("click",e=>{
   const cf  = e.target.closest("[data-cf]");    if(cf){ taskClassFilter = cf.dataset.cf; renderTasks(); return; }
   const ctg = e.target.closest("[data-ctoggle]");if(ctg){ const f=$("#clsForm"); f.style.display = f.style.display==="none"?"flex":"none"; if(f.style.display==="flex") $("#cName").focus(); return; }
   const cco = e.target.closest("[data-ccolor]"); if(cco){ newClassColor = cco.dataset.ccolor; renderTasks(); return; }
+  const tv  = e.target.closest("[data-tv]");    if(tv){ taskView = tv.dataset.tv; renderTasks(); return; }
+  const cn  = e.target.closest("[data-calnav]");if(cn){ const d=Number(cn.dataset.calnav); calOffset = d===0 ? 0 : calOffset+d; renderTaskCal(); return; }
+  const cap = e.target.closest("[data-calapp]");if(cap){ switchView("apps"); editApp(cap.dataset.calapp); return; }
+  const cdy = e.target.closest("[data-calday]");if(cdy){ $("#tDue").value = cdy.dataset.calday; $("#tTitle").focus(); return; }
   const lbm = e.target.closest("[data-lbm]");   if(lbm){ lbMetric = lbm.dataset.lbm; renderFriends(); return; }
   const fn  = e.target.closest("[data-fnudge]");if(fn) return nudgeFriend(fn.dataset.fnudge, fn);
   const fd  = e.target.closest("[data-fdel]");  if(fd) return deleteFriend(fd.dataset.fdel);
