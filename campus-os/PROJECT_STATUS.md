@@ -141,9 +141,20 @@ localStorage + export/import, responsive, seed data), plus:
       No digit shortcut (1–0 taken); sidebar or palette. SCHEMA_VERSION
       = 11: migrate() adds `money: {budget:0, txs:[]}`
 
-## What is NOT done (see docs/ROADMAP.md)
+## What is NOT done — NEXT UP: follow docs/BUILD_PLAN.md
 
-- [ ] AI helper (roadmap 7b) — natural next: recap writer / note summarizer
+**`docs/BUILD_PLAN.md` is the authoritative spec for the next five
+versions** (written July 15 2026 from competitive research; implement in
+order, one version per commit, browser-verified):
+
+- [ ] v0.15 — Natural-language quick add (no schema change)
+- [ ] v0.16 — Schedule-aware Today "plan my day" (schema 12) ← signature feature
+- [ ] v0.17 — Grades + what-do-I-need-on-the-final (schema 13)
+- [ ] v0.18 — Flashcards, spaced repetition from notes (schema 14)
+- [ ] v0.19 — PWA: installable + offline (adds manifest/sw.js/icons files)
+
+After those (see docs/ROADMAP.md):
+- [ ] AI helper (roadmap 7b) — recap writer / note summarizer / flashcard generation
 - [ ] Notes extras: tables, images (roadmap 7)
 - [ ] Optional React migration (roadmap phase 3)
 

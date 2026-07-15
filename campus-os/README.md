@@ -36,6 +36,7 @@ campus-os/
 │   └── index.html       ← the entire app (HTML + CSS + JS, self-contained)
 └── docs/
     ├── ARCHITECTURE.md  ← how the code is organized, data model, key functions
+    ├── BUILD_PLAN.md    ← detailed spec for v0.15–v0.19 (implement in order)
     ├── DESIGN.md        ← design tokens (colors, fonts) and UI rules
     └── ROADMAP.md       ← planned features, in priority order
 ```

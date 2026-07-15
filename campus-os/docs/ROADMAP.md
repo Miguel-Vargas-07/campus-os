@@ -88,8 +88,10 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
 
 Claude researched the app categories Campus OS touches (student planners,
 habit trackers, daily planners, study tools, job trackers) and identified
-the five highest-value additions, ranked. Evidence and reasoning live in
-the session notes; short version:
+the five highest-value additions, ranked. **Build order and full
+implementation spec: `docs/BUILD_PLAN.md` (v0.15–v0.19)** — order chosen
+there is 3 → 1 → 5 → 2 → 4 (quick-add first as a cheap win, PWA last).
+Short version of the research:
 
 1. **Schedule-aware Today / "Plan my day"** (Structured, Shovel, Sunsama,
    MyStudyLife) — render today's classes as a timeline, drag tasks/focus
