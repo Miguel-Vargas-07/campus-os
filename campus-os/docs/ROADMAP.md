@@ -5,10 +5,10 @@ Claude session comfortably.
 
 ## Phase 1 — daily-driver features (vanilla JS, same file)
 
-1. **Internship application tracker** ← NEXT — new view + `apps` array in state:
-   company, role, status (wishlist → applied → OA → interview → offer/rejected),
-   deadline, link, notes. Kanban-style columns by status.
-2. **Classes database** — `classes` array (name, code, color, schedule);
+1. ~~**Internship application tracker**~~ shipped in v0.6 — Internships view,
+   `apps` array, kanban columns by status (wishlist → applied → OA →
+   interview → offer/rejected), deadline/link/notes, edit-in-form.
+2. **Classes database** ← NEXT — `classes` array (name, code, color, schedule);
    assignments reference a classId instead of free text; class filter chips
    on the Assignments view.
 3. **Calendar view** — month grid rendering tasks by due date.

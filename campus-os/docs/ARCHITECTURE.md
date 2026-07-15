@@ -149,6 +149,40 @@ verses:      [ { id, ref, text } ]
   to field/pine by prefers-color-scheme.
 - Adding a scheme = one entry in SCHEMES. Nothing else.
 
+## v0.6 additions (SCHEMA_VERSION = 6)
+
+**Internship application tracker (`apps` view, nav "Internships"):**
+
+```js
+apps: [
+  { id, company, role,
+    status,          // "wishlist" | "applied" | "oa" | "interview" | "offer" | "rejected"
+    deadline,        // "YYYY-MM-DD" or "" (application deadline)
+    link,            // posting / portal URL or ""
+    notes,           // free text
+    created,         // ISO timestamp
+    updated }        // YYYY-MM-DD, stamped on every edit or status move
+]
+```
+
+- Pipeline order lives in `APP_STATUSES`; labels in `APP_LABELS`. Adding a
+  stage = extend both arrays (kanban grid uses `repeat(6, …)` — update the
+  `.kanban` column count too).
+- `renderApps()` builds one `.kb-col` per status; cards sorted by deadline
+  (empty deadlines last). Deadline chip goes `overdue` (flag) when past and
+  the app is not in a terminal state (offer/rejected).
+- Moving: `moveApp(id, ±1)` shifts along `APP_STATUSES`, clamped at the ends
+  (◀ disabled on wishlist, ▶ disabled on rejected).
+- Editing: clicking a card calls `editApp(id)` — loads it into the top form
+  (`selectedApp` module state, mirrors `selectedNote`); the Add button becomes
+  "Update" and a Cancel button appears. `submitApp()` handles both add and
+  update; company is the only required field.
+- Delegated clicks (in the shared body listener): `data-amove` / `data-adel`
+  are checked **before** `data-aedit` so the buttons inside a card don't
+  trigger edit; `data-alink` returns early so the posting link opens normally.
+- `migrate()` v5→v6 just adds `apps: []`.
+- Keyboard shortcuts renumbered to 1–9 (6 = Internships).
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

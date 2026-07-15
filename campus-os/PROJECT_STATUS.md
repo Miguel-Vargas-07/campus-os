@@ -14,13 +14,14 @@
 
 ## Version
 
-- **v0.5** — July 14, 2026. Obsidian-style notes + color scheme gallery.
+- **v0.6** — July 15, 2026. Internship application tracker (kanban).
+- v0.5 — July 14, 2026. Obsidian-style notes + color scheme gallery.
 - v0.4 — July 14, 2026. Day/night/auto theme.
 - v0.3 — July 14, 2026. Progress dashboard + task completion dates.
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.5)
+## What is DONE (v0.6)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -62,11 +63,17 @@ localStorage + export/import, responsive, seed data), plus:
       SCHEMES object → inline CSS vars on <html>; data-theme still drives
       dark component overrides. SCHEMA_VERSION = 5: settings.theme →
       settings.scheme (auto/field/pine mapping)
+- [x] **Internship tracker (v0.6):** Internships view (nav MAIN, shortcut 6;
+      Reflect/Faith/Settings now 7/8/9) — `apps` array (company, role,
+      status, deadline, link, notes, created, updated), kanban columns
+      wishlist → applied → OA → interview → offer / rejected, ◀ ▶ move
+      buttons (clamped), click-card-to-edit via the top form (Update/Cancel),
+      overdue deadline chip on non-terminal apps, seeded with 2 samples.
+      SCHEMA_VERSION = 6: migrate() adds `apps: []`
 
 ## What is NOT done (see docs/ROADMAP.md)
 
-- [ ] Internship application tracker  ← suggested next task
-- [ ] Classes as their own database
+- [ ] Classes as their own database  ← suggested next task
 - [ ] Calendar view / kanban view of assignments
 - [ ] Recurring habit targets (e.g. lift MWF only)
 - [ ] Search, markdown in notes, dark mode
@@ -83,15 +90,16 @@ localStorage + export/import, responsive, seed data), plus:
 
 ## Last session summary
 
-Session 5 (same day): Obsidian-lite notes (wikilinks, tags, search,
-backlinks, markdown-lite) and 7-scheme color gallery (schema v5,
-settings.scheme). Also discussed AI integration with Miguel: plan of record
-is an optional "AI helper" using the Anthropic API directly from the app
-(user pastes their own API key, stored in localStorage, direct browser
-calls) — fine for personal use, NOT acceptable if the app is ever published
-for others (would need a small proxy backend / Supabase edge function).
-Suggested model: Haiku 4.5 for cheap summarize/flashcard features.
-Login decision from session 4 stands: local-first; Supabase phase 2.5 if
-sync is ever wanted.
-Next suggested task: **internship application tracker** (still roadmap #1),
-or the AI helper if Miguel gets an API key.
+Session 6 (July 15, 2026): Project moved to a **private GitHub repo**
+(github.com/Miguel-Vargas-07/campus-os, pushed via `gh` CLI — future
+sessions can `git pull`/`git push` there; commit after each work session).
+Built the **internship application tracker** (v0.6, schema 6): kanban
+Internships view with move/edit/delete, overdue deadline chips; verified in
+browser (add/move/edit, v5→v6 import migration, dark + light schemes,
+localStorage persistence, shortcut 6). Docs updated (ARCHITECTURE v0.6
+section, ROADMAP item 1 struck).
+AI-helper plan of record from session 5 unchanged (own API key, Haiku 4.5,
+personal use only). Login decision stands: local-first; Supabase phase 2.5
+if sync is ever wanted.
+Next suggested task: **classes database** (roadmap #2), or the AI helper if
+Miguel gets an API key.

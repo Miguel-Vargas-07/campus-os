@@ -275,6 +275,30 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
 .bar-val{font-family:var(--mono);font-size:10px;fill:var(--ink);font-weight:600}
 @media (max-width:820px){ .stats{grid-template-columns:repeat(2,1fr)} }
 
+/* ---------- Internships (kanban) ---------- */
+.kanban{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;align-items:start}
+.kb-col{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px;min-height:70px}
+.kb-head{font-family:var(--mono);font-size:10px;letter-spacing:.12em;font-weight:600;color:var(--ink-soft);padding:2px 4px 8px;display:flex;justify-content:space-between}
+.kb-head .kb-count{opacity:.7}
+.kb-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);box-shadow:var(--shadow);padding:10px 11px;margin-bottom:8px;cursor:pointer;transition:all .14s ease}
+.kb-card:hover{border-color:var(--green);transform:translateY(-1px)}
+.kb-card:last-child{margin-bottom:0}
+.kb-card .kb-company{font-weight:600;font-size:13.5px}
+.kb-card .kb-role{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.kb-card .kb-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px}
+.kb-card .kb-link{font-family:var(--mono);font-size:10.5px;color:var(--green);text-decoration:none;font-weight:600}
+.kb-card .kb-link:hover{text-decoration:underline}
+.kb-card .kb-notes{font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kb-card .kb-actions{display:flex;gap:2px;margin-top:7px;align-items:center}
+.kb-card .kb-actions .mv{border:1px solid var(--line);background:var(--card);border-radius:6px;font-size:10px;padding:2px 8px;color:var(--ink-soft)}
+.kb-card .kb-actions .mv:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+.kb-card .kb-actions .mv:disabled{opacity:.3;cursor:default}
+.kb-card .kb-actions .x{margin-left:auto;border:0;background:none;color:var(--ink-soft);font-size:13px;padding:2px 6px;border-radius:4px;opacity:.45}
+.kb-card .kb-actions .x:hover{color:var(--flag);opacity:1}
+.kb-empty{font-size:11.5px;color:var(--ink-soft);text-align:center;padding:10px 4px;opacity:.7}
+@media (max-width:1120px){ .kanban{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:820px){ .kanban{grid-template-columns:1fr} }
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -303,11 +327,12 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
     <button data-view="progress">Progress <span class="key">3</span></button>
     <button data-view="habits">Habits <span class="key">4</span></button>
     <button data-view="notes">Notes <span class="key">5</span></button>
+    <button data-view="apps">Internships <span class="key">6</span></button>
     <div class="sep">INNER</div>
-    <button data-view="reflect">Reflect <span class="key">6</span></button>
-    <button data-view="faith">Faith <span class="key">7</span></button>
+    <button data-view="reflect">Reflect <span class="key">7</span></button>
+    <button data-view="faith">Faith <span class="key">8</span></button>
     <div class="sep">SYSTEM</div>
-    <button data-view="settings">Settings <span class="key">8</span></button>
+    <button data-view="settings">Settings <span class="key">9</span></button>
   </nav>
   <div class="storage-warn" id="storageWarn">Storage unavailable — changes won't persist. Use Export.</div>
   <div class="side-foot"><span id="footStats"></span><button class="theme-btn" id="themeBtn" title="Toggle theme"></button></div>
@@ -407,6 +432,29 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
     </div>
   </section>
 
+  <!-- INTERNSHIPS -->
+  <section class="view" id="view-apps">
+    <div class="view-head">
+      <div><div class="eyebrow">PIPELINE</div><h1>Internships</h1><div class="subtitle">Every application, from wishlist to offer.</div></div>
+    </div>
+    <div class="form-row">
+      <input type="text" id="aCompany" placeholder="Company" style="max-width:170px">
+      <input type="text" id="aRole" placeholder="Role (e.g. SWE Intern)">
+      <select id="aStatus">
+        <option value="wishlist" selected>Wishlist</option><option value="applied">Applied</option>
+        <option value="oa">OA</option><option value="interview">Interview</option>
+        <option value="offer">Offer</option><option value="rejected">Rejected</option>
+      </select>
+      <input type="date" id="aDeadline" title="Application deadline">
+      <input type="text" id="aLink" placeholder="Link (posting / portal)" style="max-width:180px">
+      <input type="text" id="aNotes" placeholder="Notes (referral, recruiter, next step…)">
+      <button class="btn primary" id="aAdd">Add application</button>
+      <button class="btn" id="aCancel" style="display:none">Cancel</button>
+    </div>
+    <div class="kanban" id="appBoard"></div>
+    <div class="hint">◀ ▶ move a card along the pipeline. Click a card to edit it in the form above.</div>
+  </section>
+
   <!-- REFLECT -->
   <section class="view" id="view-reflect">
     <div class="view-head">
@@ -485,7 +533,7 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -543,6 +591,10 @@ function seed(){
       {id:uid(),title:"Big-O Cheat Sheet",updated:new Date().toISOString(),
        body:"# Big-O quick reference #cs101\n\n- O(1) — hash lookup\n- O(log n) — binary search\n- O(n) — single loop\n- O(n log n) — good sorts\n- O(n²) — nested loops\n\nSee [[Welcome to Campus OS]] for how notes work."}
     ],
+    apps: [
+      {id:uid(),company:"Stripe",role:"SWE Intern (Summer '27)",status:"wishlist",deadline:plus(20),link:"https://stripe.com/jobs",notes:"Ask Vic about a referral",created:new Date().toISOString(),updated:todayStr()},
+      {id:uid(),company:"NASA JPL",role:"Software Intern",status:"applied",deadline:"",link:"",notes:"Applied through handshake",created:new Date().toISOString(),updated:todayStr()}
+    ],
     reflections: [],
     prayers: [],
     verses: [
@@ -576,6 +628,10 @@ function migrate(data){
     data.settings.scheme = t==="light" ? "field" : t==="dark" ? "pine" : "auto";
     delete data.settings.theme;
     data.schema = 5;
+  }
+  if(data.schema === 5){
+    data.apps = data.apps || [];
+    data.schema = 6;
   }
   return data;
 }
@@ -686,6 +742,61 @@ function addVerse(ref, text){
   save(); render();
 }
 function deleteVerse(id){ state.verses = state.verses.filter(v=>v.id!==id); save(); render(); }
+
+/* ---------- actions: internships ---------- */
+const APP_STATUSES = ["wishlist","applied","oa","interview","offer","rejected"];
+const APP_LABELS = {wishlist:"WISHLIST",applied:"APPLIED",oa:"OA",interview:"INTERVIEW",offer:"OFFER",rejected:"REJECTED"};
+let selectedApp = null; // id being edited in the form, or null = adding
+
+function readAppForm(){
+  return {
+    company: $("#aCompany").value.trim(),
+    role: $("#aRole").value.trim(),
+    status: $("#aStatus").value,
+    deadline: $("#aDeadline").value,
+    link: $("#aLink").value.trim(),
+    notes: $("#aNotes").value.trim()
+  };
+}
+function clearAppForm(){
+  $("#aCompany").value=""; $("#aRole").value=""; $("#aStatus").value="wishlist";
+  $("#aDeadline").value=""; $("#aLink").value=""; $("#aNotes").value="";
+  selectedApp = null;
+  $("#aAdd").textContent = "Add application";
+  $("#aCancel").style.display = "none";
+}
+function submitApp(){
+  const f = readAppForm();
+  if(!f.company) return;
+  if(selectedApp){
+    const a = state.apps.find(a=>a.id===selectedApp); if(!a) { clearAppForm(); return; }
+    Object.assign(a, f, {updated: todayStr()});
+  } else {
+    state.apps.push({id:uid(), ...f, created:new Date().toISOString(), updated:todayStr()});
+  }
+  clearAppForm(); save(); render();
+}
+function editApp(id){
+  const a = state.apps.find(a=>a.id===id); if(!a) return;
+  selectedApp = id;
+  $("#aCompany").value = a.company; $("#aRole").value = a.role; $("#aStatus").value = a.status;
+  $("#aDeadline").value = a.deadline||""; $("#aLink").value = a.link||""; $("#aNotes").value = a.notes||"";
+  $("#aAdd").textContent = "Update";
+  $("#aCancel").style.display = "";
+  $("#aCompany").focus();
+}
+function moveApp(id, dir){
+  const a = state.apps.find(a=>a.id===id); if(!a) return;
+  const i = APP_STATUSES.indexOf(a.status) + dir;
+  if(i < 0 || i >= APP_STATUSES.length) return;
+  a.status = APP_STATUSES[i]; a.updated = todayStr();
+  save(); render();
+}
+function deleteApp(id){
+  if(!confirm("Delete this application?")) return;
+  if(selectedApp===id) clearAppForm();
+  state.apps = state.apps.filter(a=>a.id!==id); save(); render();
+}
 
 /* ---------- rendering ---------- */
 let activeView = "today";
@@ -958,6 +1069,37 @@ function renderFaith(){
   : `<div class="empty">No saved verses yet.</div>`;
 }
 
+function renderApps(){
+  const td = todayStr();
+  const card = a => {
+    const terminal = a.status==="offer" || a.status==="rejected";
+    const overdue = a.deadline && a.deadline < td && !terminal;
+    const first = APP_STATUSES.indexOf(a.status)===0, last = APP_STATUSES.indexOf(a.status)===APP_STATUSES.length-1;
+    return `<div class="kb-card" data-aedit="${a.id}">
+      <div class="kb-company">${esc(a.company)}</div>
+      ${a.role?`<div class="kb-role">${esc(a.role)}</div>`:""}
+      <div class="kb-meta">
+        ${a.deadline?(overdue?`<span class="chip overdue">${fmtDue(a.deadline)}</span>`:`<span class="chip todo">${fmtDue(a.deadline)}</span>`):""}
+        ${a.link?`<a class="kb-link" href="${esc(a.link)}" target="_blank" rel="noopener" data-alink>link ↗</a>`:""}
+      </div>
+      ${a.notes?`<div class="kb-notes" title="${esc(a.notes)}">${esc(a.notes)}</div>`:""}
+      <div class="kb-actions">
+        <button class="mv" data-amove="${a.id}" data-dir="-1" title="Move back" ${first?"disabled":""}>◀</button>
+        <button class="mv" data-amove="${a.id}" data-dir="1" title="Move forward" ${last?"disabled":""}>▶</button>
+        <button class="x" data-adel="${a.id}" title="Delete">✕</button>
+      </div>
+    </div>`;
+  };
+  $("#appBoard").innerHTML = APP_STATUSES.map(s=>{
+    const list = state.apps.filter(a=>a.status===s)
+      .sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
+    return `<div class="kb-col">
+      <div class="kb-head"><span>${APP_LABELS[s]}</span><span class="kb-count">${list.length||""}</span></div>
+      ${list.length ? list.map(card).join("") : `<div class="kb-empty">—</div>`}
+    </div>`;
+  }).join("");
+}
+
 /* ---------- progress dashboard ---------- */
 let progPeriod = "weekly";
 function monthKey(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
@@ -1104,7 +1246,7 @@ function renderSettings(){
 }
 
 const renderers = {today:renderToday, tasks:renderTasks, progress:renderProgress, habits:renderHabits,
-                   notes:renderNotes, reflect:renderReflect, faith:renderFaith, settings:renderSettings};
+                   notes:renderNotes, apps:renderApps, reflect:renderReflect, faith:renderFaith, settings:renderSettings};
 function render(){ renderers[activeView](); renderSideFoot(); }
 function switchView(v){
   activeView = v;
@@ -1119,7 +1261,7 @@ $("#nav").addEventListener("click",e=>{
 });
 document.addEventListener("keydown",e=>{
   if(e.target.matches("input,textarea,select")) return;
-  const map = {"1":"today","2":"tasks","3":"progress","4":"habits","5":"notes","6":"reflect","7":"faith","8":"settings"};
+  const map = {"1":"today","2":"tasks","3":"progress","4":"habits","5":"notes","6":"apps","7":"reflect","8":"faith","9":"settings"};
   if(map[e.key]) switchView(map[e.key]);
 });
 document.body.addEventListener("click",e=>{
@@ -1135,6 +1277,10 @@ document.body.addEventListener("click",e=>{
   const wl  = e.target.closest("[data-wl]");    if(wl) return openOrCreateNote(wl.dataset.wl);
   const ntg = e.target.closest("[data-ntag]");  if(ntg){ noteTagFilter = noteTagFilter===ntg.dataset.ntag ? null : ntg.dataset.ntag; renderNoteFilters(); renderNoteList(); return; }
   const sc  = e.target.closest("[data-scheme]");if(sc){ state.settings.scheme = sc.dataset.scheme; save(); applyTheme(); return; }
+  if(e.target.closest("[data-alink]")) return; // let the link open normally
+  const am  = e.target.closest("[data-amove]"); if(am) return moveApp(am.dataset.amove, Number(am.dataset.dir));
+  const ad  = e.target.closest("[data-adel]");  if(ad) return deleteApp(ad.dataset.adel);
+  const ae  = e.target.closest("[data-aedit]"); if(ae) return editApp(ae.dataset.aedit);
 });
 document.body.addEventListener("change",e=>{
   const hb = e.target.closest("[data-habit-today]");
@@ -1164,6 +1310,11 @@ $("#progFilters").addEventListener("click",e=>{
 $("#hAdd").addEventListener("click",()=>{ addHabit($("#hName").value); $("#hName").value=""; });
 $("#hName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#hAdd").click(); });
 $("#nNew").addEventListener("click",newNote);
+$("#aAdd").addEventListener("click",submitApp);
+$("#aCancel").addEventListener("click",clearAppForm);
+$("#aCompany").addEventListener("keydown",e=>{ if(e.key==="Enter") submitApp(); });
+$("#aRole").addEventListener("keydown",e=>{ if(e.key==="Enter") submitApp(); });
+$("#aNotes").addEventListener("keydown",e=>{ if(e.key==="Enter") submitApp(); });
 $("#pAdd").addEventListener("click",()=>{ addPrayer($("#pText").value); $("#pText").value=""; });
 $("#pText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#pAdd").click(); });
 $("#vAdd").addEventListener("click",()=>{ addVerse($("#vRef").value, $("#vText").value); $("#vRef").value=""; $("#vText").value=""; });
