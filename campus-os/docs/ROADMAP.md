@@ -44,6 +44,15 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
     deliberate learning exercise (Miguel has built React POCs before);
     the vanilla version stays as the reference implementation.
 
+## Shipped outside the original plan
+
+- **Friends / circle leaderboard (v0.7)** — no-backend version via pasted
+  "friend codes" (base64 stat snapshots): community leaderboard filterable
+  by tasks / habit consistency / pipeline moves / reflection streak,
+  copy-to-clipboard nudge messages. A live version (real accounts, in-app
+  nudges) would ride on the Supabase phase 2.5 plan; the snapshot shape is
+  designed to become the sync payload.
+
 ## Parking lot (maybe never)
 
 - Shared pages (would need a backend — big scope jump)

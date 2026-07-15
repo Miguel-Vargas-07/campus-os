@@ -14,14 +14,15 @@
 
 ## Version
 
-- **v0.6** — July 15, 2026. Internship application tracker (kanban).
+- **v0.7** — July 15, 2026. Friends circle + leaderboard (friend codes).
+- v0.6 — July 15, 2026. Internship application tracker (kanban).
 - v0.5 — July 14, 2026. Obsidian-style notes + color scheme gallery.
 - v0.4 — July 14, 2026. Day/night/auto theme.
 - v0.3 — July 14, 2026. Progress dashboard + task completion dates.
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.6)
+## What is DONE (v0.7)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -70,6 +71,15 @@ localStorage + export/import, responsive, seed data), plus:
       buttons (clamped), click-card-to-edit via the top form (Update/Cancel),
       overdue deadline chip on non-terminal apps, seeded with 2 samples.
       SCHEMA_VERSION = 6: migrate() adds `apps: []`
+- [x] **Friends circle (v0.7):** no-backend community leaderboard — trade
+      "friend codes" (COS1- base64 stat snapshots; settings.shareId
+      identifies you, re-pasting a code refreshes that friend), metric
+      filter chips (tasks this week [default] / habit consistency /
+      pipeline moves / reflection streak), bars scaled to group max,
+      no rank numbers (community framing), YOU row live, STALE chip on
+      codes >7 days old, per-friend copy-to-clipboard nudge messages,
+      group-total line. Shortcut 7 (Reflect/Faith/Settings → 8/9/0).
+      SCHEMA_VERSION = 7: migrate() adds `friends: []` + settings.shareId
 
 ## What is NOT done (see docs/ROADMAP.md)
 
@@ -94,12 +104,18 @@ Session 6 (July 15, 2026): Project moved to a **private GitHub repo**
 (github.com/Miguel-Vargas-07/campus-os, pushed via `gh` CLI — future
 sessions can `git pull`/`git push` there; commit after each work session).
 Built the **internship application tracker** (v0.6, schema 6): kanban
-Internships view with move/edit/delete, overdue deadline chips; verified in
-browser (add/move/edit, v5→v6 import migration, dark + light schemes,
-localStorage persistence, shortcut 6). Docs updated (ARCHITECTURE v0.6
-section, ROADMAP item 1 struck).
+Internships view with move/edit/delete, overdue deadline chips.
+Then built the **Friends circle** (v0.7, schema 7) — Miguel asked for a
+friends/leaderboard/community feature; given the choice between friend
+codes (no backend) and activating Supabase, he chose **friend codes now**,
+and asked that the leaderboard be filterable by all four metrics with a
+community feel rather than first-vs-last (tasks-this-week is the default
+metric). Both versions verified in browser (migrations v5→v6→v7, code
+round-trip, self/garbage code rejection, re-paste refresh, stale chip,
+nudge clipboard, dark + light schemes). Docs updated each time.
 AI-helper plan of record from session 5 unchanged (own API key, Haiku 4.5,
 personal use only). Login decision stands: local-first; Supabase phase 2.5
-if sync is ever wanted.
+if sync is ever wanted — the friend-code snapshot shape was designed to
+become the Supabase sync payload if that day comes.
 Next suggested task: **classes database** (roadmap #2), or the AI helper if
 Miguel gets an API key.

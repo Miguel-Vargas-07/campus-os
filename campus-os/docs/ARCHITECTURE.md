@@ -183,6 +183,47 @@ apps: [
 - `migrate()` v5→v6 just adds `apps: []`.
 - Keyboard shortcuts renumbered to 1–9 (6 = Internships).
 
+## v0.7 additions (SCHEMA_VERSION = 7)
+
+**Friends / circle leaderboard — no backend, "friend codes":**
+
+```js
+settings.shareId   // stable uid, generated once (migrate v6→v7); identifies
+                   // this person across codes so re-pastes update, not dupe
+friends: [
+  { id,            // local row id
+    fid,           // the friend's shareId (from their code)
+    name, added,
+    snapshot: {    // parsed from the last code they sent
+      g,           // YYYY-MM-DD the code was generated ("as of")
+      t,           // tasks completed that week
+      hb, hp,      // best habit streak, habit consistency % (last 7 days)
+      a,           // internship pipeline moves that week (apps.updated >= Monday)
+      r } }        // reflection streak (consecutive days)
+]
+```
+
+- **Share code** = `"COS1-" + base64(JSON payload)` with compact keys
+  `{v:1, id, n, g, t, hb, hp, a, r}` — built by `myShareCode()` from
+  `myStats()` (computed live), parsed by `parseShareCode()` (validates
+  v/id/n, returns null on garbage). Unicode-safe via the
+  `encodeURIComponent`/`escape` btoa dance.
+- `addFriendCode()` upserts by `fid` (pasting a newer code refreshes the
+  friend), rejects your own code (`id === settings.shareId`).
+- **Leaderboard**: `LB_METRICS` map (tasks / habits / apps / reflect), each
+  `{label, get(snapshot), fmt(snapshot)}` — filter chips switch `lbMetric`
+  (default "tasks"). Rows = you (live `myStats()`) + friends (snapshots),
+  sorted by metric; bars scale to the group max. Community framing: no rank
+  numbers, "YOU" chip, group-total line under the board. Snapshots older
+  than 7 days get a STALE chip (`daysAgo()`).
+- **Nudge**: per-friend button copies a rotating encouragement message
+  (`NUDGES` templates) to the clipboard via `copyText()` (async clipboard
+  API with execCommand fallback + button-label flash) — to paste into any
+  messaging app. There is no in-app delivery; this is deliberate (no backend).
+- Shortcuts renumbered: 7 = Friends, 8/9/0 = Reflect/Faith/Settings.
+- If live sync ever happens (Supabase phase 2.5), the snapshot shape is the
+  sync payload — swap "paste a code" for "fetch rows", keep everything else.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the
