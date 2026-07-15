@@ -373,6 +373,22 @@ html[data-theme="dark"] .tag{color:#D8BC5A}
 html[data-theme="dark"] .cal-pill.over{background:#332014}
 html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
 
+/* ---------- Command palette ---------- */
+.pal-overlay{position:fixed;inset:0;background:rgba(10,18,14,.45);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 0}
+.pal{width:min(560px,94vw);overflow:hidden;animation:rise .16s ease}
+.pal input{width:100%;border:0;padding:15px 18px;font-size:15px;background:var(--card)}
+.pal input:focus{outline:none}
+.pal-results{max-height:330px;overflow-y:auto;border-top:1px solid var(--line)}
+.pal-item{display:flex;gap:10px;align-items:center;padding:10px 16px;cursor:pointer;font-size:13.5px}
+.pal-item .pi-icon{width:20px;text-align:center;flex-shrink:0}
+.pal-item .pi-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pal-item.on{background:var(--green-soft)}
+.pal-item .pi-sub{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink-soft);letter-spacing:.06em;flex-shrink:0}
+.pal-foot{font-family:var(--mono);font-size:9.5px;color:var(--ink-soft);padding:8px 16px;border-top:1px solid var(--line);letter-spacing:.04em}
+.pal-btn{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);margin:0 0 14px;padding:8px 12px;border-radius:10px;color:var(--pine-text);font-size:13px;text-align:left;width:100%}
+.pal-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.pal-btn .key{margin-left:auto;font-family:var(--mono);font-size:9.5px;opacity:.5}
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -387,6 +403,9 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
   .nav .key,.nav .sep,.side-foot{display:none}
   .main{padding:20px 16px 60px}
   .today-grid,.notes-layout,.faith-grid{grid-template-columns:1fr}
+  .pal-btn{margin:0;padding:8px 10px;width:auto;flex-shrink:0}
+  .pal-btn .key{display:none}
+  .cal-cell{min-height:64px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -395,6 +414,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
 
 <aside class="sidebar">
   <div class="logo">Campus<span class="dot">OS</span></div>
+  <button class="pal-btn" id="palBtn"><span>🔍</span> Search & jump <span class="key">CTRL K</span></button>
   <nav class="nav" id="nav">
     <button data-view="today" class="active">Today <span class="key">1</span></button>
     <button data-view="tasks">Assignments <span class="key">2</span></button>
@@ -640,6 +660,14 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
   </section>
 
 </main>
+
+<div class="pal-overlay" id="palOverlay" style="display:none">
+  <div class="pal card">
+    <input id="palInput" placeholder="Search tasks, notes, views… or type a new task" autocomplete="off">
+    <div class="pal-results" id="palResults"></div>
+    <div class="pal-foot">↑↓ NAVIGATE · ENTER SELECT · ESC CLOSE</div>
+  </div>
+</div>
 
 <script>
 /* =========================================================
@@ -1751,6 +1779,82 @@ function switchView(v){
   document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
   render();
 }
+
+/* ---------- command palette ---------- */
+const PAL_VIEWS = [
+  ["today","Today","🏠"],["tasks","Assignments","📚"],["progress","Progress","📈"],
+  ["habits","Habits","🔁"],["notes","Notes","📝"],["apps","Internships","🚀"],
+  ["friends","Friends","👥"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
+];
+let palSel = 0, palList = [];
+function palOpen(){ $("#palOverlay").style.display="flex"; const i=$("#palInput"); i.value=""; palBuild(""); i.focus(); }
+function palClose(){ $("#palOverlay").style.display="none"; }
+function palBuild(q){
+  q = q.trim();
+  const ql = q.toLowerCase();
+  const score = s => { const t=String(s).toLowerCase(); return !ql ? 1 : t.startsWith(ql) ? 3 : t.includes(ql) ? 2 : 0; };
+  const items = [];
+  PAL_VIEWS.forEach(([id,label,icon])=>{
+    const s = score(label);
+    if(s) items.push({s:s+.5, icon, label:`Go to ${label}`, sub:"VIEW", run:()=>switchView(id)});
+  });
+  if(ql){
+    state.tasks.forEach(t=>{
+      const s = score(t.title); if(!s) return;
+      const c = classById(t.classId);
+      items.push({s:s+(t.status!=="done"?.4:0), icon:t.status==="done"?"✅":"⬜", label:t.title,
+        sub:`TASK${c?` · ${c.code||c.name}`:""}${t.due?` · ${fmtDue(t.due)}`:""}`,
+        run:()=>{ taskFilter="all"; taskClassFilter="all"; taskView="list"; switchView("tasks"); }});
+    });
+    state.notes.forEach(n=>{
+      const s = Math.max(score(n.title), n.body.toLowerCase().includes(ql)?1.5:0); if(!s) return;
+      items.push({s, icon:"📝", label:n.title||"Untitled", sub:"NOTE",
+        run:()=>{ selectedNote=n.id; switchView("notes"); }});
+    });
+    state.apps.forEach(a=>{
+      const s = Math.max(score(a.company), score(a.role||"")); if(!s) return;
+      items.push({s, icon:"🚀", label:`${a.company}${a.role?` — ${a.role}`:""}`, sub:`APP · ${APP_LABELS[a.status]}`,
+        run:()=>{ switchView("apps"); editApp(a.id); }});
+    });
+    state.habits.forEach(h=>{
+      const s = score(h.name); if(!s) return;
+      items.push({s, icon:"🔁", label:h.name, sub:"HABIT", run:()=>switchView("habits")});
+    });
+  } else {
+    items.push({s:.4, icon:"➕", label:"New note", sub:"ACTION", run:()=>{ switchView("notes"); newNote(); }});
+    items.push({s:.4, icon:"📤", label:"Copy my friend code", sub:"ACTION", run:()=>copyText(myShareCode())});
+  }
+  items.sort((a,b)=>b.s-a.s);
+  palList = items.slice(0,11);
+  if(ql) palList.push({s:0, icon:"➕", label:`Add task: “${q}”`, sub:"NEW TASK",
+    run:()=>{ taskView="list"; switchView("tasks"); addTask(q,"","","med"); }});
+  palSel = 0;
+  palRender();
+}
+function palRender(){
+  $("#palResults").innerHTML = palList.length ? palList.map((it,i)=>`
+    <div class="pal-item ${i===palSel?"on":""}" data-pi="${i}">
+      <span class="pi-icon">${it.icon}</span><span class="pi-label">${esc(it.label)}</span><span class="pi-sub">${esc(it.sub)}</span>
+    </div>`).join("") : `<div class="empty">No matches.</div>`;
+  const on = $("#palResults .pal-item.on"); if(on) on.scrollIntoView({block:"nearest"});
+}
+function palRun(i){ const it = palList[i]; if(!it) return; palClose(); it.run(); }
+$("#palBtn").addEventListener("click", palOpen);
+$("#palOverlay").addEventListener("click", e=>{ if(e.target.id==="palOverlay") palClose(); });
+$("#palResults").addEventListener("click", e=>{ const it=e.target.closest("[data-pi]"); if(it) palRun(Number(it.dataset.pi)); });
+$("#palInput").addEventListener("input", e=>palBuild(e.target.value));
+$("#palInput").addEventListener("keydown", e=>{
+  if(e.key==="ArrowDown"){ e.preventDefault(); palSel=Math.min(palSel+1,palList.length-1); palRender(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); palSel=Math.max(palSel-1,0); palRender(); }
+  else if(e.key==="Enter"){ palRun(palSel); }
+  else if(e.key==="Escape"){ palClose(); }
+});
+document.addEventListener("keydown", e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="k"){
+    e.preventDefault();
+    $("#palOverlay").style.display==="none" ? palOpen() : palClose();
+  }
+});
 
 /* ---------- events ---------- */
 $("#nav").addEventListener("click",e=>{
