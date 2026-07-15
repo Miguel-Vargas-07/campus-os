@@ -14,7 +14,10 @@
 
 ## Version
 
-- **v0.10** — July 15, 2026. Weekly recap card.
+- **v0.13** — July 15, 2026. Focus timer (schema 10).
+- v0.12 — July 15, 2026. Command palette (Ctrl+K).
+- v0.11 — July 15, 2026. Assignments views: List / Board / Calendar.
+- v0.10 — July 15, 2026. Weekly recap card.
 - v0.9 — July 15, 2026. Recurring habit targets.
 - v0.8 — July 15, 2026. Classes database.
 - v0.7 — July 15, 2026. Friends circle + leaderboard (friend codes).
@@ -25,7 +28,7 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.10)
+## What is DONE (v0.13)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
@@ -100,11 +103,28 @@ localStorage + export/import, responsive, seed data), plus:
       best habit, avg mood, pipeline moves, reflection days); "Copy recap
       for your circle" text ends with your friend code; Sunday-evening
       nudge on Today. Pure derived data — schema unchanged (still 9)
+- [x] **Assignments views (v0.11):** Notion-style lenses on one database —
+      List / Board / Calendar tabs in the view header. Board = todo/doing/
+      done kanban, click card to advance. Calendar = Mon-first month grid:
+      task pills (class colors, done struck, overdue flagged) advance on
+      click, internship deadlines as 🚀 pills (click → edit), empty-day
+      click prefills the due date, ◀ Today ▶ month nav. Class filter works
+      in every lens. No schema change
+- [x] **Command palette (v0.12):** Ctrl/Cmd+K anywhere (or 🔍 sidebar
+      button) — scored search across views, tasks, notes (title+body),
+      internships, habits; ↑↓/Enter/Esc; empty query shows quick actions;
+      last row always quick-adds the query as a task. Covers roadmap
+      "search across tasks". No schema change
+- [x] **Focus timer (v0.13):** pomodoro sprints on Today — optional task,
+      15/25/50m presets, WebAudio chime, sidebar countdown chip in every
+      view, "End early" logs whole elapsed minutes (<1m logs nothing).
+      Sessions in `focus` array; focus minutes in Today hero + weekly
+      recap card/copy text. SCHEMA_VERSION = 10: migrate() adds `focus: []`
 
 ## What is NOT done (see docs/ROADMAP.md)
 
-- [ ] Calendar view / kanban view of assignments  ← next from roadmap
-- [ ] Search across tasks
+- [ ] AI helper (roadmap 7b) — natural next: recap writer / note summarizer
+- [ ] Notes extras: tables, images (roadmap 7)
 - [ ] Optional React migration (roadmap phase 3)
 
 ## Conventions future sessions must follow
@@ -117,6 +137,24 @@ localStorage + export/import, responsive, seed data), plus:
 5. After any work session, update this file's DONE/NOT DONE lists and version.
 
 ## Last session summary
+
+Session 7 (July 15, 2026): Miguel asked Claude to take inspiration from
+similar apps and build creatively. Three features, three commits, all
+verified in a live browser (served over localhost; migrations 9→10, board
+click-to-advance, calendar month nav + 🚀 deadline pills + day-click
+quick-add, palette search/quick-add/keyboard nav, full focus session
+fast-forwarded to completion, early-stop under 1 minute logs nothing):
+- **v0.11 Assignments lenses** (Notion-inspired): List / Board / Calendar
+  tabs — closed roadmap #3 and #4 at once.
+- **v0.12 Command palette** (Linear/Raycast-inspired): Ctrl+K search across
+  everything + quick-add task — closed roadmap #6.
+- **v0.13 Focus timer** (Forest/Pomofocus-inspired): task-linked sprints,
+  chime, `focus` log (SCHEMA_VERSION = 10), recap/hero integration.
+Note: the body click listener now checks `data-del` before `data-cycle`
+(board/calendar nest delete inside the cycle target) — preserve that order.
+Commits are local; not yet pushed to GitHub.
+Next suggested task: the **AI helper** (roadmap 7b) — the weekly recap and
+note summaries are ready surfaces — or notes tables/images.
 
 Session 6 (July 15, 2026): Project moved to a **private GitHub repo**
 (github.com/Miguel-Vargas-07/campus-os, pushed via `gh` CLI — future

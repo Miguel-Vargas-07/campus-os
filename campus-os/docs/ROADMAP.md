@@ -11,15 +11,18 @@ Claude session comfortably.
 2. ~~**Classes database**~~ shipped in v0.8 — `classes` array (name, code,
    color, schedule), tasks reference classId, class filter chips + inline
    class management on the Assignments view.
-3. **Calendar view** ← NEXT — month grid rendering tasks by due date.
-4. **Kanban view for assignments** — status columns with click-to-advance
-   (data model already supports it).
+3. ~~**Calendar view**~~ shipped in v0.11 — month lens on Assignments:
+   tasks by due date (class colors), internship deadlines as 🚀 pills,
+   click-a-day to quick-add.
+4. ~~**Kanban view for assignments**~~ shipped in v0.11 — board lens on
+   Assignments (todo / doing / done, click-to-advance).
 5. ~~**Recurring habits config**~~ shipped in v0.9 — per-habit target days
    (habit.days, 0=Mon), streaks skip rest days, Today shows only due habits.
 
 ## Phase 2 — polish
 
-6. Search across TASKS (notes search shipped in v0.5).
+6. ~~Search across TASKS~~ shipped in v0.12 as the command palette (Ctrl+K):
+   searches tasks, notes, internships, habits and views, plus quick-add.
 7. ~~Basic markdown in notes~~ shipped in v0.5. Possible extras: tables, images.
 7b. **AI helper (optional):** Settings field for user's own Anthropic API
     key → summarize note / flashcards from note / NL task add. Haiku 4.5.
@@ -45,6 +48,13 @@ Plan of record: **Supabase** (free tier) rather than a hand-rolled backend.
     the vanilla version stays as the reference implementation.
 
 ## Shipped outside the original plan
+
+- **Focus timer (v0.13)** — pomodoro-style deep-work sprints (15/25/50m)
+  optionally tied to a task; chime on finish; sessions logged (schema 10);
+  focus minutes in the Today hero and weekly recap. Inspired by
+  Forest/Pomofocus.
+- **Command palette (v0.12)** — Ctrl+K search-and-jump across everything,
+  Linear/Raycast-style; subsumes roadmap #6.
 
 - **Weekly recap card (v0.10)** — week-in-review hero on Progress (tasks
   vs last week, habit %, best habit, mood, pipeline, reflections) with

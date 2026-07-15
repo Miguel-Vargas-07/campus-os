@@ -283,6 +283,69 @@ classes: [ { id, name, code, color, schedule } ]  // color ∈ CLASS_COLORS
 - Sunday-evening nudge on Today (`#recapNudge`, `getDay()===0 && h>=17`)
   jumps to Progress — same pattern as the reflect nudge.
 
+## v0.11 additions (no schema change)
+
+**Assignments as three lenses (List / Board / Calendar) — Notion-style database views:**
+
+- `taskView` module state ("list" | "board" | "cal"), switched by the
+  `#taskViewTabs` chips in the view header (`data-tv`). `renderTasks()` sets
+  container visibility + the hint text, then delegates to `renderTaskBoard()`
+  or `renderTaskCal()`. The class filter applies in all three lenses; the
+  status filter row only shows in list mode (board columns ARE the statuses).
+- **Board:** `TASK_COLS = ["todo","doing","done"]`, reuses the `.kanban`
+  styles with a `.k3` 3-column modifier. Clicking a card advances status
+  (`data-cycle` on the whole card); ✕ deletes. NOTE: because the ✕ nests
+  inside the cycle target, the body click listener now checks `data-del`
+  BEFORE `data-cycle` — keep that order.
+- **Calendar:** `calOffset` module state (months from current; "Today"
+  resets to 0). Mon-first month grid, rows = `ceil((firstDow+days)/7)`.
+  Task pills (class-colored dot, done = struck, past-due = flag) advance
+  status on click via `data-cycle`. Internship deadlines for non-terminal
+  apps render as 🚀 pills (`data-calapp` → jump to Internships + edit).
+  Clicking an empty day (`data-calday`) prefills `#tDue` and focuses
+  `#tTitle` — calendar-first task capture. Max 3 pills per cell, then
+  "+N more".
+
+## v0.12 additions (no schema change)
+
+**Command palette (Ctrl+K / ⌘K) — Linear/Raycast-style:**
+
+- `#palOverlay` fixed overlay + `#palInput` + `#palResults`; opened by
+  Ctrl/Cmd+K anywhere, the 🔍 sidebar button (`#palBtn`), closed by Esc /
+  backdrop click. ↑↓ + Enter keyboard navigation (`palSel` index).
+- `palBuild(q)` scores sources with startsWith(3) > includes(2):
+  views ("Go to …"), tasks (icon = ⬜/✅, open tasks rank higher), notes
+  (title or body match), internships (company/role), habits. Empty query
+  shows views + quick actions (new note, start focus, copy friend code).
+  Last row is always **Add task: "q"** — quick-add from anywhere (this is
+  the roadmap's "search across tasks" feature, generalized).
+- Task/note/app results navigate to their view (notes select the note,
+  apps load the edit form). Nothing mutates on selection except quick-add.
+
+## v0.13 additions (SCHEMA_VERSION = 10)
+
+**Focus timer (Forest/pomodoro-style deep-work sprints):**
+
+```js
+focus: [ { id, date:"YYYY-MM-DD", mins, taskId } ]  // one entry per finished session
+```
+
+- `migrate()` v9→v10 adds `focus: []`.
+- `#focusPanel` card on Today (right column, above habits): idle state =
+  open-task select + 15/25/50m preset chips (`FOCUS_PRESETS`, `focusMins`)
+  + Start; running state = mm:ss `#focusClock`, task name, "End early".
+- `focusRun` module state {taskId, mins, started, endsAt, timer} — a 1s
+  `setInterval` (`focusTick`) updates the clock and the sidebar mini chip
+  (`#focusMini`, visible in every view, click → Today). Deliberately NOT
+  persisted: reloading mid-session drops the run; only finished sessions
+  are logged.
+- `focusEnd(completed)`: completed sessions log `mins` as planned and play
+  `focusChime()` (two WebAudio sine notes — no audio file); "End early"
+  logs elapsed whole minutes, and under 1 minute logs nothing.
+- Surfaces: Today hero ("focus Xm" once > 0), weekly recap card + copied
+  recap text ("🎯 Xm of deep work", omitted when 0). `weekRecap()` gained
+  `focusMins`.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the
