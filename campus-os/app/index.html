@@ -113,7 +113,7 @@ h1,h2,h3{font-family:var(--disp)}
 
 /* ---------- Forms ---------- */
 .form-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
-.form-row input[type=text],.form-row input[type=date],.form-row select,.input{
+.form-row input[type=text],.form-row input[type=date],.form-row input[type=number],.form-row select,.input{
   border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;background:var(--card);font-size:13.5px;
 }
 .form-row input[type=text]{flex:1;min-width:160px}
@@ -398,6 +398,16 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
 .focus-mini{display:none;margin:8px 0 0;border:1px solid rgba(95,201,143,.4);background:rgba(95,201,143,.1);color:#5FC98F;border-radius:999px;padding:5px 11px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em}
 .focus-mini:hover{background:rgba(95,201,143,.2)}
 
+/* ---------- Money ---------- */
+.money-bar{height:10px;border-radius:999px;background:var(--paper);border:1px solid var(--line);overflow:hidden;margin-top:10px}
+.money-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--green-deep));transition:width .3s ease}
+.money-fill.over{background:linear-gradient(90deg,var(--flag),#B84A20)}
+.tx-amt{font-family:var(--mono);font-size:12.5px;font-weight:600;white-space:nowrap;color:var(--ink)}
+.tx-amt.in{color:var(--green)}
+.cat-emoji{width:30px;height:30px;border-radius:8px;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.budget-input{width:96px;border:0;background:none;font:inherit;color:inherit;padding:0}
+.budget-input:focus{outline:none;border-bottom:2px solid var(--green)}
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -432,6 +442,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
     <button data-view="notes">Notes <span class="key">5</span></button>
     <button data-view="apps">Internships <span class="key">6</span></button>
     <button data-view="friends">Friends <span class="key">7</span></button>
+    <button data-view="money">Money</button>
     <div class="sep">INNER</div>
     <button data-view="reflect">Reflect <span class="key">8</span></button>
     <button data-view="faith">Faith <span class="key">9</span></button>
@@ -602,6 +613,28 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
     <div class="hint" id="lbTotal"></div>
   </section>
 
+  <!-- MONEY -->
+  <section class="view" id="view-money">
+    <div class="view-head">
+      <div><div class="eyebrow">WALLET</div><h1>Money</h1><div class="subtitle">Where it goes, month by month. Local only — nothing leaves this browser.</div></div>
+    </div>
+    <div class="form-row">
+      <input type="number" id="mAmount" placeholder="0.00" min="0" step="0.01" style="max-width:110px">
+      <select id="mCat" style="max-width:180px"></select>
+      <input type="text" id="mNote" placeholder="What was it? (e.g. Chipotle with Vic)">
+      <input type="date" id="mDate">
+      <button class="btn primary" id="mAdd">Add</button>
+    </div>
+    <div class="stats" id="moneyStats"></div>
+    <div class="card" style="padding:20px 22px 14px;margin-bottom:16px">
+      <h3 style="font-size:15px;margin-bottom:4px">Spending — last 6 months</h3>
+      <div id="moneyChart"></div>
+    </div>
+    <div class="filters" id="moneyFilters"></div>
+    <div class="card" id="txList"></div>
+    <div class="hint">Log it when you pay it — five seconds. Income uses the 💵 category. Set the budget by typing in its card.</div>
+  </section>
+
   <!-- REFLECT -->
   <section class="view" id="view-reflect">
     <div class="view-head">
@@ -688,7 +721,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -762,6 +795,11 @@ function seed(){
        snapshot:{g:plus(-1),t:4,hb:5,hp:64,a:1,r:2}}
     ],
     focus: [],
+    money: {budget: 200, txs: [
+      {id:uid(),date:todayStr(),amount:12.50,cat:"food",note:"Chipotle with Vic"},
+      {id:uid(),date:plus(-2),amount:5.99,cat:"subs",note:"Spotify student"},
+      {id:uid(),date:plus(-3),amount:150,cat:"income",note:"Tutoring"}
+    ]},
     reflections: [],
     prayers: [],
     verses: [
@@ -833,6 +871,11 @@ function migrate(data){
     // v10: focus sessions log
     data.focus = data.focus || [];
     data.schema = 10;
+  }
+  if(data.schema === 10){
+    // v11: money tracker (budget 0 = unset)
+    data.money = data.money || {budget:0, txs:[]};
+    data.schema = 11;
   }
   return data;
 }
@@ -1184,6 +1227,106 @@ function renderFocusPanel(){
         <button class="btn primary" data-fstart="1" style="margin-left:auto">Start</button>
       </div>`;
   }
+}
+
+/* ---------- money ---------- */
+const MONEY_CATS = {
+  food:      {label:"Food",          emoji:"🍔"},
+  transport: {label:"Transport",     emoji:"🚌"},
+  school:    {label:"School",        emoji:"📚"},
+  fun:       {label:"Fun",           emoji:"🎉"},
+  subs:      {label:"Subscriptions", emoji:"🔁"},
+  other:     {label:"Other",         emoji:"🧾"},
+  income:    {label:"Income",        emoji:"💵"}
+};
+let moneyCatFilter = "all";
+function fmtMoney(n){ return "$" + n.toFixed(2); }
+function addTx(amount, cat, note, date){
+  const a = Math.round(parseFloat(amount)*100)/100;
+  if(!(a > 0) || !MONEY_CATS[cat]) return;
+  state.money.txs.push({id:uid(), date:date||todayStr(), amount:a, cat, note:(note||"").trim()});
+  save(); render();
+}
+function deleteTx(id){ state.money.txs = state.money.txs.filter(t=>t.id!==id); save(); render(); }
+function setBudget(v){
+  const b = Math.round(parseFloat(v)*100)/100;
+  state.money.budget = b > 0 ? b : 0;
+  save(); render();
+}
+function renderMoney(){
+  const td = todayStr(), ym = td.slice(0,7);
+  const sel = $("#mCat"), prev = sel.value;
+  sel.innerHTML = Object.entries(MONEY_CATS).map(([id,c])=>`<option value="${id}">${c.emoji} ${c.label}</option>`).join("");
+  if([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+  if(!$("#mDate").value) $("#mDate").value = td;
+
+  const txs = state.money.txs;
+  const monthTx = txs.filter(t=>t.date.slice(0,7)===ym);
+  const spent  = monthTx.filter(t=>t.cat!=="income").reduce((a,t)=>a+t.amount,0);
+  const income = monthTx.filter(t=>t.cat==="income").reduce((a,t)=>a+t.amount,0);
+  const b = state.money.budget, left = b - spent;
+  const byCat = {};
+  monthTx.forEach(t=>{ if(t.cat!=="income") byCat[t.cat]=(byCat[t.cat]||0)+t.amount; });
+  const top = Object.entries(byCat).sort((x,y)=>y[1]-x[1])[0];
+
+  $("#moneyStats").innerHTML = `
+    <div class="card stat"><div class="s-label">SPENT THIS MONTH</div>
+      <div class="s-value">${fmtMoney(spent)}</div>
+      <div class="s-sub">${monthTx.filter(t=>t.cat!=="income").length} purchase${monthTx.filter(t=>t.cat!=="income").length!==1?"s":""}</div></div>
+    <div class="card stat"><div class="s-label">MONTHLY BUDGET</div>
+      <div class="s-value">$<input type="number" id="mBudget" class="budget-input" value="${b||""}" placeholder="set" min="0" step="1"></div>
+      ${b?`<div class="money-bar"><div class="money-fill ${spent>b?"over":""}" style="width:${Math.min(100,Math.round(spent/b*100))}%"></div></div>
+        <div class="s-sub">${left>=0?`${fmtMoney(left)} left`:`<span class="downp">${fmtMoney(-left)} over</span>`}</div>`
+       :`<div class="s-sub">type a number to set one</div>`}</div>
+    <div class="card stat"><div class="s-label">INCOME THIS MONTH</div>
+      <div class="s-value">${fmtMoney(income)}</div>
+      <div class="s-sub">${income-spent>=0?"+":"−"}${fmtMoney(Math.abs(income-spent))} net</div></div>
+    <div class="card stat"><div class="s-label">TOP CATEGORY</div>
+      <div class="s-value">${top?MONEY_CATS[top[0]].emoji:"—"}</div>
+      <div class="s-sub">${top?`${MONEY_CATS[top[0]].label} · ${fmtMoney(top[1])}`:"nothing yet"}</div></div>`;
+  $("#mBudget").addEventListener("change", e=>setBudget(e.target.value));
+
+  // 6-month spending chart (same pure-SVG pattern as Progress)
+  const months = [];
+  for(let i=5;i>=0;i--){ const d=new Date(); months.push(new Date(d.getFullYear(), d.getMonth()-i, 1)); }
+  const vals = months.map(m=>{
+    const k = monthKey(m);
+    return txs.filter(t=>t.cat!=="income" && t.date.slice(0,7)===k).reduce((a,t)=>a+t.amount,0);
+  });
+  const maxV = Math.max(...vals, 1);
+  const W=720, H=170, padL=6, padB=26, padT=18, gap=10, bw=(W-padL*2-gap*5)/6;
+  $("#moneyChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending per month">
+    <defs><linearGradient id="moneyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E7A4B"/><stop offset="1" stop-color="#166B41"/>
+    </linearGradient></defs>
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padL}" y2="${H-padB}" stroke="var(--line)" stroke-width="1"/>
+    ${months.map((m,i)=>{
+      const v=vals[i], bh=Math.max(v/maxV*(H-padT-padB), v>0?4:2);
+      const x=padL+i*(bw+gap), y=H-padB-bh;
+      return `<rect class="bar" x="${x}" y="${y}" width="${bw}" height="${bh}" rx="5" ${i===5?'style="fill:url(#moneyGrad);opacity:1"':""}><title>${m.toLocaleDateString(undefined,{month:"long",year:"numeric"})} — ${fmtMoney(v)}</title></rect>
+        ${v>0?`<text class="bar-val" x="${x+bw/2}" y="${y-5}" text-anchor="middle">${fmtMoney(v)}</text>`:""}
+        <text class="bar-label" x="${x+bw/2}" y="${H-8}" text-anchor="middle">${m.toLocaleDateString(undefined,{month:"short"})}</text>`;
+    }).join("")}</svg>`;
+
+  $("#moneyFilters").innerHTML =
+    `<button data-mcf="all" class="${moneyCatFilter==="all"?"on":""}">All</button>` +
+    Object.entries(MONEY_CATS).map(([id,c])=>{
+      const n = monthTx.filter(t=>t.cat===id).length;
+      return `<button data-mcf="${id}" class="${moneyCatFilter===id?"on":""}">${c.emoji} ${c.label}${n?` · ${n}`:""}</button>`;
+    }).join("");
+
+  const list = monthTx.filter(t=>moneyCatFilter==="all"||t.cat===moneyCatFilter)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  $("#txList").innerHTML = list.length ? list.map(t=>{
+    const c = MONEY_CATS[t.cat] || MONEY_CATS.other;
+    const inc = t.cat==="income";
+    return `<div class="task">
+      <span class="cat-emoji">${c.emoji}</span>
+      <span class="t-title">${esc(t.note||c.label)} <span class="t-cls">· ${fmtDue(t.date)}</span></span>
+      <span class="tx-amt ${inc?"in":""}">${inc?"+":"−"}${fmtMoney(t.amount)}</span>
+      <button class="x" data-txdel="${t.id}" title="Delete">✕</button>
+    </div>`;
+  }).join("") : `<div class="empty">No transactions${moneyCatFilter!=="all"?" in this category":""} this month.</div>`;
 }
 
 /* ---------- rendering ---------- */
@@ -1733,7 +1876,8 @@ function weekRecap(){
   const appsWeek = state.apps.filter(a=>a.updated && a.updated>=monS).length;
   const refDays = state.reflections.filter(r=>r.date>=monS && r.date<=td).length;
   const focusMins = state.focus.filter(f=>f.date>=monS && f.date<=td).reduce((a,f)=>a+f.mins,0);
-  return {monS, td, tasksNow, tasksPrev, habitPct, best, bestN, avgMood, appsWeek, refDays, focusMins};
+  const spentWeek = state.money.txs.filter(t=>t.cat!=="income" && t.date>=monS && t.date<=td).reduce((a,t)=>a+t.amount,0);
+  return {monS, td, tasksNow, tasksPrev, habitPct, best, bestN, avgMood, appsWeek, refDays, focusMins, spentWeek};
 }
 function recapText(){
   const r = weekRecap();
@@ -1760,6 +1904,7 @@ function renderRecap(){
         ${r.focusMins?`<span>🎯 <b>${r.focusMins}m</b> focused</span>`:""}
         <span>🚀 <b>${r.appsWeek}</b> pipeline move${r.appsWeek!==1?"s":""}</span>
         <span>🌙 <b>${r.refDays}</b> reflection${r.refDays!==1?"s":""}${r.avgMood?` · avg mood ${MOODS[r.avgMood-1]}`:""}</span>
+        ${r.spentWeek?`<span>💸 <b>${fmtMoney(r.spentWeek)}</b> spent</span>`:""}
       </div>
     </div>
     <button class="btn rc-copy" id="recapCopy">Copy recap for your circle</button>`;
@@ -1874,7 +2019,8 @@ function renderSettings(){
 }
 
 const renderers = {today:renderToday, tasks:renderTasks, progress:renderProgress, habits:renderHabits,
-                   notes:renderNotes, apps:renderApps, friends:renderFriends, reflect:renderReflect, faith:renderFaith, settings:renderSettings};
+                   notes:renderNotes, apps:renderApps, friends:renderFriends, money:renderMoney,
+                   reflect:renderReflect, faith:renderFaith, settings:renderSettings};
 function render(){ renderers[activeView](); renderSideFoot(); }
 function switchView(v){
   activeView = v;
@@ -1887,7 +2033,7 @@ function switchView(v){
 const PAL_VIEWS = [
   ["today","Today","🏠"],["tasks","Assignments","📚"],["progress","Progress","📈"],
   ["habits","Habits","🔁"],["notes","Notes","📝"],["apps","Internships","🚀"],
-  ["friends","Friends","👥"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
+  ["friends","Friends","👥"],["money","Money","💸"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
 ];
 let palSel = 0, palList = [];
 function palOpen(){ $("#palOverlay").style.display="flex"; const i=$("#palInput"); i.value=""; palBuild(""); i.focus(); }
@@ -2002,6 +2148,8 @@ document.body.addEventListener("click",e=>{
   const fm  = e.target.closest("[data-fmin]");  if(fm){ const sel=$("#focusTask")?$("#focusTask").value:""; focusMins=Number(fm.dataset.fmin); renderFocusPanel(); if($("#focusTask")) $("#focusTask").value=sel; return; }
   const fst = e.target.closest("[data-fstart]");if(fst) return focusStart();
   const fsp = e.target.closest("[data-fstop]"); if(fsp) return focusEnd(false);
+  const txd = e.target.closest("[data-txdel]"); if(txd) return deleteTx(txd.dataset.txdel);
+  const mcf = e.target.closest("[data-mcf]");   if(mcf){ moneyCatFilter = mcf.dataset.mcf; renderMoney(); return; }
 });
 $("#focusMini").addEventListener("click",()=>switchView("today"));
 document.body.addEventListener("change",e=>{
@@ -2051,6 +2199,12 @@ $("#pAdd").addEventListener("click",()=>{ addPrayer($("#pText").value); $("#pTex
 $("#pText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#pAdd").click(); });
 $("#vAdd").addEventListener("click",()=>{ addVerse($("#vRef").value, $("#vText").value); $("#vRef").value=""; $("#vText").value=""; });
 $("#vText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#vAdd").click(); });
+$("#mAdd").addEventListener("click",()=>{
+  addTx($("#mAmount").value, $("#mCat").value, $("#mNote").value, $("#mDate").value);
+  $("#mAmount").value=""; $("#mNote").value="";
+});
+$("#mAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#mAdd").click(); });
+$("#mNote").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#mAdd").click(); });
 $("#themeBtn").addEventListener("click",cycleTheme);
 $("#noteSearch").addEventListener("input",e=>{ noteSearch = e.target.value; renderNoteList(); });
 $("#nameInput").addEventListener("input",e=>{ state.settings.name = e.target.value; save(); renderSideFoot(); });
