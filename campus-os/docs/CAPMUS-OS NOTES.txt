@@ -1,0 +1,11 @@
+CAPMUS-OS NOTES
+
+Add a dashboard
+
+Add AI agent
+
+Add connection to services like google
+
+Add finances
+
+Add blog/community thread area
