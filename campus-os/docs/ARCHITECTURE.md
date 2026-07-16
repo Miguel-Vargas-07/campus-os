@@ -555,6 +555,69 @@ grading: null | {
   on-render fields that can't take a one-time static listener the way
   `#tTitle` etc. do.
 
+## v0.18 additions (SCHEMA_VERSION = 14)
+
+**Flashcards, spaced repetition from notes:**
+
+```js
+state.cards = { [key]: { ease, ivl, due:"YYYY-MM-DD", reps, lapses } }
+// key = noteId + "|" + question text (trimmed, lowercased) — an object, not an array
+```
+
+- Cards are **derived, not authored separately** — the note body stays
+  the single source of truth. `noteCards(note)` line-scans the body:
+  a line matching `^Q:\s*(.+)$`, followed by the next *non-empty* line if
+  it matches `^A:\s*(.+)$`, becomes one card; a `Q:` with no matching `A:`
+  right after it is silently skipped (not an error — lets "Q: eek" typos
+  or a stray colon just not become a card) and the scan continues from
+  the very next line, not past it. `allCards()` flat-maps this over every
+  note. Editing a `Q:` line changes its key, orphaning the old SRS entry —
+  harmless (see prune below); editing `A:` only doesn't affect scheduling
+  at all since the key has no `A:` component.
+- `migrate()` v13→14 adds `state.cards = {}`. Separately, `load()` (not
+  migrate — runs on fresh-seeded state too) prunes any `state.cards` key
+  whose `noteId` prefix (`key.split("|")[0]`) no longer matches a live
+  note, right alongside the existing `plans` 14-day prune. Text-orphans
+  (the `Q:` text changed but the note itself still exists) are left alone
+  on purpose — they just won't be reachable via `noteCards()` anymore,
+  no cleanup needed.
+- `gradeCard(key, grade)` — SM-2-lite, date-granularity (comment table is
+  in the function): starts a card at `{ease:2.5, ivl:0, reps:0, lapses:0}`
+  on first grade. **Again**: `ivl=1`, `ease=max(1.3,ease−0.2)`,
+  `lapses++`, reps *not* incremented. **Hard**: `ivl=max(1,round(ivl×1.2))`,
+  `ease=max(1.3,ease−0.15)`. **Good**: `reps===0→ivl=1`; `reps===1→ivl=3`;
+  else `ivl=round(ivl×ease)`. **Easy**: `ivl=max(2,round(ivl×ease×1.3))`,
+  `ease+=0.15`. All non-Again grades increment `reps`; `ivl` is capped at
+  365 for every grade; `due = today + ivl` always follows the same rule
+  (Again's "due tomorrow" isn't a special case — it falls out of `ivl=1`).
+  `dueCards()` = derived cards with no `state.cards` entry yet, or
+  `entry.due <= todayStr()`. `nextDueDate()` = earliest `due` strictly
+  after today across all scheduled cards, for the post-session message.
+- `studySession` (module var, **not persisted** — reloading mid-session
+  drops it, same pattern as `focusRun`) is one of: `null` (idle),
+  `{cards, idx, showAnswer}` (active — `cards` is a shuffled snapshot
+  taken once at `startStudy()`, not re-derived per card), or
+  `{done:true, nextDue}` (session-complete screen). `startStudy(noteId)`
+  — `null` studies everything due; a note id studies just that note's due
+  cards — no-ops if the resulting pool is empty. `studyGrade(grade)`
+  grades the current card then advances or transitions to `{done:true}`.
+  `endStudy()` resets to idle from either the active session or the done
+  screen (same handler, `data-studyend`, on both "End session" and "Back").
+- `renderStudy()`: empty state (zero cards anywhere — teaches the `Q:`/`A:`
+  format, links to Notes) → onboarding-style, same spirit as Grades' empty
+  state. Idle: hero stat line + per-note rows (`data-studynote`, only
+  clickable when that note has ≥1 due — no dead-end taps). Active: `Q`
+  through `esc`+`renderInline` (wikilinks/tags/bold/code all work in
+  cards, for free, same as note previews), reveal button → `A` +
+  Again/Hard/Good/Easy (colored via existing `--flag`/`--amber`/`--green`/
+  `--green-deep` tokens — no new CSS). No new CSS classes at all this
+  version; entirely reused `.card`/`.panel`/`.btn`/`.hint`/`.task`/
+  `.focus-row`.
+- Nav: MAIN, right after Notes (not at the end of the group like Money/
+  Grades — Study pairs with Notes since cards come *from* notes). No
+  digit shortcut. Today gets a `#studyNudge` (`.nudge`, same pattern as
+  `#reflectNudge`/`#recapNudge`) when `dueCards().length > 0`.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

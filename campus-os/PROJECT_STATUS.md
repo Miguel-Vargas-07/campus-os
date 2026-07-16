@@ -25,7 +25,8 @@
 
 ## Version
 
-- **v0.17** — July 16, 2026. Grades + what-do-I-need-on-the-final (schema 13).
+- **v0.18** — July 16, 2026. Flashcards, spaced repetition from notes (schema 14).
+- v0.17 — July 16, 2026. Grades + what-do-I-need-on-the-final (schema 13).
 - v0.16 — July 16, 2026. Schedule-aware Today / "plan my day" (schema 12).
 - v0.15 — July 16, 2026. Natural-language quick add (schema 11, unchanged).
 - v0.14 — July 15, 2026. Money view (schema 11).
@@ -43,10 +44,29 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.17)
+## What is DONE (v0.18)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
+
+- [x] **Flashcards, spaced repetition from notes (v0.18):** new Study view
+      (nav MAIN right after Notes, no digit shortcut, in the command
+      palette) — cards are derived at read time from `Q:`/`A:` line pairs
+      already in note bodies, never duplicated into a separate authoring
+      format. Idle state: "N cards due · M total across K notes", a
+      per-note breakdown (click a note with due cards to study just that
+      note), an empty state that teaches the `Q:`/`A:` format when no
+      notes have any yet. Session: one card at a time (shuffled), "Show
+      answer" reveals it plus four grade buttons (Again/Hard/Good/Easy,
+      flag/amber/green/green-deep), a progress counter, "End session";
+      finishing shows "Done — next cards due {date}". SM-2-lite scheduler
+      (ease starts 2.5, `ivl` capped at 365 days) — same math as any
+      spaced-repetition app: Again resets the interval and dings the ease;
+      Good/Easy grow it. A 🧠 nudge appears on Today when cards are due.
+      SCHEMA_VERSION = 14: migrate() adds `state.cards` (an object keyed
+      by `noteId|question text`, not an array); `load()` also prunes any
+      card entry whose note no longer exists. Seed: two demo cards added
+      to the Big-O Cheat Sheet note.
 
 - [x] **Grades + what-do-I-need-on-the-final (v0.17):** new Grades view
       (nav MAIN after Money, no digit shortcut, in the command palette) —
@@ -199,11 +219,9 @@ localStorage + export/import, responsive, seed data), plus:
 
 ## What is NOT done — NEXT UP: follow docs/BUILD_PLAN.md
 
-**`docs/BUILD_PLAN.md` is the authoritative spec for v0.18–v0.19**
-(written July 15 2026 from competitive research; implement in order, one
-version per commit, browser-verified):
+**`docs/BUILD_PLAN.md` is the authoritative spec for v0.19**
+(written July 15 2026 from competitive research):
 
-- [ ] v0.18 — Flashcards, spaced repetition from notes (schema 14)
 - [ ] v0.19 — PWA: installable + offline (adds manifest/sw.js/icons files)
 
 After those (see docs/ROADMAP.md):
@@ -317,9 +335,42 @@ palette entry and navigation; dark scheme. Category deletion's
 `confirm()` dialog blocks this session's automation entirely (times out
 the tool call) — not tested live, but it's the identical pattern already
 used safely by the pre-existing `deleteClass`/`deleteHabit`/`deleteNote`,
-so verified by code review only. Zero console errors. Committed locally;
-**not pushed** — holding for Miguel to check the work before starting
-v0.18.
+so verified by code review only. Zero console errors. Committed. Miguel
+asked for a live walkthrough before pushing — walked through Today's
+timeline (with a task planned live into a real gap), the Assignments
+day-toggle class form, and Grades (87.0% B+ chip badge, the three stat
+cards) via a mix of one working screenshot and DOM-state narration (the
+browser pane's screenshot action was intermittently timing out this
+session — one capture succeeded, several after didn't, unrelated to app
+code). Miguel approved; pushed both v0.16 and v0.17 together (note: an
+earlier "push and move forward" instruction had been given after v0.16
+specifically, and got missed — only the "move forward" half happened;
+worth double-checking a push actually landed before treating it as done,
+not just remembering that it was asked for).
+
+Continued into **v0.18 flashcards, spaced repetition from notes** (schema
+14) — see the DONE list above. Applied the by-now-standard verification
+recipe cleanly this time (fresh reload → one `new Function()` full-script
+parse check → fresh reload again before any interactive testing → direct
+DOM `.click()`/`dispatchEvent`/`form_input`, never the browser pane's
+native `type`/`key`/`click` actions) and it went smoothly — no new bugs
+found this round, likely because the collision- and `.map()`-callback
+mistakes from v0.16/v0.17 got caught by grepping for them proactively
+this time rather than by accident. Verified: 2 demo cards derive correctly
+from the Big-O note's `Q:`/`A:` pairs; a full session (reveal → grade
+"Good" on a new card → `ease` unchanged at 2.5, `ivl` 1, `reps` 1, due
+tomorrow 2026-07-17, exactly per the SM-2 table; reveal → grade "Again" on
+the second → `ease` down to 2.3, `lapses` 1, `reps` stays 0, due tomorrow)
+matched hand-computed expectations exactly; session-complete screen ("Done
+— next cards due Jul 17") and the idle state's "All caught up" after;
+per-note rows correctly stop being clickable at 0 due; the Today nudge
+appears/disappears with the due count; the empty state teaches the format
+and its "Open Notes" button navigates; migration v13→14 on a crafted
+payload; orphaned `state.cards` entries (pointing at a deleted note) get
+pruned on load while real ones survive; palette entry; dark scheme. Zero
+console errors. Committed locally; **not pushed** — holding for Miguel to
+check the work before starting v0.19 (the last of the five planned
+versions).
 
 Session 8 (July 15, 2026, same sitting as session 7): Miguel's idea notes
 (`docs/CAPMUS-OS NOTES.txt` — filename typo kept at his call: dashboard,

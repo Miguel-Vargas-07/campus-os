@@ -322,7 +322,7 @@ v12→13; palette entry; dark scheme; zero console errors. Commit
 
 ---
 
-## v0.18 — Flashcards: spaced repetition from notes
+## v0.18 — Flashcards: spaced repetition from notes ✅ SHIPPED
 
 **SCHEMA_VERSION → 14.** Anki-style retrieval practice sourced from the
 notes the user already writes. Differentiator: planner + linked notes + SRS
