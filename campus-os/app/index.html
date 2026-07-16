@@ -157,6 +157,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .habit-check input{width:17px;height:17px;accent-color:var(--green)}
 .quick{display:flex;gap:8px;margin-top:8px}
 .quick input{flex:1;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13.5px}
+.nl-prev{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .nudge{display:block;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--gold-soft);color:#8A6E12;font-size:13px;border:0;width:100%;text-align:left}
 .nudge:hover{filter:brightness(.97)}
 .streak{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600}
@@ -470,6 +471,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
         <h3>Due soon <span class="count">next 7 days</span></h3>
         <div id="dueList"></div>
         <div class="quick"><input type="text" id="quickInput" placeholder="Quick add a task… (Enter)"></div>
+        <div class="nl-prev" id="nlPreview" style="display:none"></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
         <div class="card panel" id="focusPanel"></div>
@@ -1329,6 +1331,87 @@ function renderMoney(){
   }).join("") : `<div class="empty">No transactions${moneyCatFilter!=="all"?" in this category":""} this month.</div>`;
 }
 
+/* ---------- natural-language quick add (v0.15) ---------- */
+const NL_DOW = ["mon","tue","wed","thu","fri","sat","sun"];
+const NL_DOW_FULL = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+function nlMatchClass(name){
+  const key = name.toLowerCase().replace(/\s+/g,"");
+  if(!key) return null;
+  let c = state.classes.find(c=>c.code && c.code.toLowerCase().replace(/\s+/g,"")===key);
+  if(c) return c;
+  c = state.classes.find(c=>c.name.toLowerCase()===name.toLowerCase());
+  if(c) return c;
+  const pre = state.classes.filter(c=>c.name.toLowerCase().startsWith(name.toLowerCase()));
+  return pre.length===1 ? pre[0] : null;
+}
+function nlDateFromDow(low, today){
+  const i = NL_DOW.indexOf(low)>=0 ? NL_DOW.indexOf(low) : NL_DOW_FULL.indexOf(low);
+  if(i<0) return null;
+  const todayDow = (today.getDay()+6)%7;
+  const d = new Date(today); d.setDate(today.getDate() + (i-todayDow+7)%7);
+  return dateStr(d);
+}
+function nlLooksLikeDate(low){
+  return low==="today"||low==="tod"||low==="tomorrow"||low==="tmr"||low==="tom"
+    || NL_DOW.includes(low) || NL_DOW_FULL.includes(low)
+    || /^\+\d+d$/.test(low) || /^\d{1,2}\/\d{1,2}$/.test(low);
+}
+function parseQuickTask(raw){
+  const tokens = raw.trim().split(/\s+/).filter(Boolean);
+  const kept = [];
+  let due = "", classId = "", priority = "", explicitPriority = false;
+  const today = new Date();
+  for(let i=0;i<tokens.length;i++){
+    const tok = tokens[i], low = tok.toLowerCase();
+
+    if(!priority && /^!(high|h|med|m|low|l)$/.test(low)){
+      priority = low[1]==="h" ? "high" : low[1]==="m" ? "med" : "low";
+      explicitPriority = true; continue;
+    }
+    if(!classId && tok[0]==="#"){
+      const c = nlMatchClass(tok.slice(1));
+      if(c){ classId = c.id; continue; }
+    }
+    if(!due){
+      if(low==="today"||low==="tod"){ due = dateStr(today); continue; }
+      if(low==="tomorrow"||low==="tmr"||low==="tom"){
+        const d=new Date(today); d.setDate(d.getDate()+1); due=dateStr(d); continue;
+      }
+      const dow = nlDateFromDow(low, today);
+      if(dow){ due = dow; continue; }
+      const plus = /^\+(\d+)d$/.exec(low);
+      if(plus){ const d=new Date(today); d.setDate(d.getDate()+Number(plus[1])); due=dateStr(d); continue; }
+      const md = /^(\d{1,2})\/(\d{1,2})$/.exec(tok);
+      if(md){
+        const mo=Number(md[1]), da=Number(md[2]);
+        if(mo>=1&&mo<=12&&da>=1&&da<=31){
+          const y = today.getFullYear();
+          let d = new Date(y, mo-1, da);
+          if(d < new Date(today.getFullYear(),today.getMonth(),today.getDate())) d = new Date(y+1, mo-1, da);
+          due = dateStr(d); continue;
+        }
+      }
+      if(low==="due" && i+1<tokens.length && nlLooksLikeDate(tokens[i+1].toLowerCase())) continue;
+    }
+    kept.push(tok);
+  }
+  const title = kept.join(" ").replace(/\s+/g," ").trim();
+  if(!title) return null;
+  return {title, classId, due, priority: priority||"med", explicitPriority};
+}
+function renderNlPreview(raw){
+  const el = $("#nlPreview"); if(!el) return;
+  const t = raw.trim() ? parseQuickTask(raw) : null;
+  if(!t || (!t.due && !t.classId && !t.explicitPriority)){ el.style.display = "none"; return; }
+  const c = t.classId ? classById(t.classId) : null;
+  el.innerHTML = [
+    t.due ? `<span class="chip todo">${fmtDue(t.due)}</span>` : "",
+    c ? `<span class="chip todo"><span class="dot" style="background:${c.color}"></span> ${esc(c.code||c.name)}</span>` : "",
+    t.explicitPriority ? `<span class="chip ${t.priority}">${t.priority.toUpperCase()}</span>` : ""
+  ].join("");
+  el.style.display = "flex";
+}
+
 /* ---------- rendering ---------- */
 let activeView = "today";
 let taskFilter = "all";
@@ -2076,8 +2159,16 @@ function palBuild(q){
   }
   items.sort((a,b)=>b.s-a.s);
   palList = items.slice(0,11);
-  if(ql) palList.push({s:0, icon:"➕", label:`Add task: “${q}”`, sub:"NEW TASK",
-    run:()=>{ taskView="list"; switchView("tasks"); addTask(q,"","","med"); }});
+  if(ql){
+    const pt = parseQuickTask(q) || {title:q, classId:"", due:"", priority:"med", explicitPriority:false};
+    const c = pt.classId ? classById(pt.classId) : null;
+    const bits = ["NEW TASK"];
+    if(pt.due) bits.push(fmtLong(pt.due));
+    if(c) bits.push(c.code||c.name);
+    if(pt.explicitPriority) bits.push(pt.priority.toUpperCase());
+    palList.push({s:0, icon:"➕", label:`Add task: "${q}"`, sub:bits.join(" · "),
+      run:()=>{ taskView="list"; switchView("tasks"); addTask(pt.title, pt.classId, pt.due, pt.priority); }});
+  }
   palSel = 0;
   palRender();
 }
@@ -2157,8 +2248,14 @@ document.body.addEventListener("change",e=>{
   if(hb) toggleHabit(hb.dataset.habitToday, todayStr());
 });
 $("#quickInput").addEventListener("keydown",e=>{
-  if(e.key==="Enter" && e.target.value.trim()){ addTask(e.target.value,"","","med"); e.target.value=""; }
+  if(e.key==="Enter" && e.target.value.trim()){
+    const t = parseQuickTask(e.target.value);
+    if(!t) return;
+    addTask(t.title, t.classId, t.due, t.priority);
+    e.target.value=""; renderNlPreview("");
+  }
 });
+$("#quickInput").addEventListener("input",e=>renderNlPreview(e.target.value));
 $("#reflectNudge").addEventListener("click",()=>switchView("reflect"));
 $("#recapNudge").addEventListener("click",()=>switchView("progress"));
 $("#tAdd").addEventListener("click",()=>{
