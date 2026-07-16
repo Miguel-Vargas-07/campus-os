@@ -424,6 +424,15 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
 .budget-input{width:96px;border:0;background:none;font:inherit;color:inherit;padding:0}
 .budget-input:focus{outline:none;border-bottom:2px solid var(--green)}
 
+/* ---------- Grades ---------- */
+.gcat-row{padding:12px 0;border-bottom:1px solid var(--line)}
+.gcat-row:last-child{border-bottom:0}
+.gcat-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gcat-avg{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.gcat-scores{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.gscore-del{border:0;background:none;color:inherit;opacity:.6;margin-left:3px;cursor:pointer;font-size:10px}
+.gscore-del:hover{opacity:1}
+
 /* ---------- Settings ---------- */
 .settings-block{padding:20px;margin-bottom:16px}
 .settings-block h3{font-size:15px;margin-bottom:6px}
@@ -459,6 +468,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
     <button data-view="apps">Internships <span class="key">6</span></button>
     <button data-view="friends">Friends <span class="key">7</span></button>
     <button data-view="money">Money</button>
+    <button data-view="grades">Grades</button>
     <div class="sep">INNER</div>
     <button data-view="reflect">Reflect <span class="key">8</span></button>
     <button data-view="faith">Faith <span class="key">9</span></button>
@@ -656,6 +666,15 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
     <div class="hint">Log it when you pay it — five seconds. Income uses the 💵 category. Set the budget by typing in its card.</div>
   </section>
 
+  <!-- GRADES -->
+  <section class="view" id="view-grades">
+    <div class="view-head">
+      <div><div class="eyebrow">TRANSCRIPT</div><h1>Grades</h1><div class="subtitle">Current grade, and what you need on the final.</div></div>
+    </div>
+    <div class="filters" id="gradeClassChips"></div>
+    <div id="gradeDetail"></div>
+  </section>
+
   <!-- REFLECT -->
   <section class="view" id="view-reflect">
     <div class="view-head">
@@ -742,7 +761,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -782,10 +801,15 @@ function classById(id){ return state.classes.find(c=>c.id===id) || null; }
 /* ---------- state ---------- */
 function seed(){
   const t = new Date(), plus = n => {const d=new Date(t);d.setDate(t.getDate()+n);return dateStr(d);};
-  const cCS   = {id:uid(),name:"CS 101",code:"CS101",color:CLASS_COLORS[0],schedule:"MWF 10am",meetings:[{days:[0,2,4],start:"10:00",end:"10:50"}]};
-  const cMath = {id:uid(),name:"Math",  code:"",     color:CLASS_COLORS[1],schedule:"",meetings:[{days:[1,3],start:"13:00",end:"14:15"}]};
-  const cCar  = {id:uid(),name:"Career",code:"",     color:CLASS_COLORS[3],schedule:"",meetings:[]};
-  const cLife = {id:uid(),name:"Life",  code:"",     color:CLASS_COLORS[4],schedule:"",meetings:[]};
+  const cCS   = {id:uid(),name:"CS 101",code:"CS101",color:CLASS_COLORS[0],schedule:"MWF 10am",meetings:[{days:[0,2,4],start:"10:00",end:"10:50"}],
+    grading:{target:90,cats:[
+      {id:uid(),name:"Homework",weight:30,isFinal:false,scores:[{id:uid(),label:"HW1",got:18,max:20},{id:uid(),label:"HW2",got:27,max:30}]},
+      {id:uid(),name:"Midterm",weight:30,isFinal:false,scores:[{id:uid(),label:"Midterm",got:84,max:100}]},
+      {id:uid(),name:"Final",weight:40,isFinal:true,scores:[]}
+    ]}};
+  const cMath = {id:uid(),name:"Math",  code:"",     color:CLASS_COLORS[1],schedule:"",meetings:[{days:[1,3],start:"13:00",end:"14:15"}],grading:null};
+  const cCar  = {id:uid(),name:"Career",code:"",     color:CLASS_COLORS[3],schedule:"",meetings:[],grading:null};
+  const cLife = {id:uid(),name:"Life",  code:"",     color:CLASS_COLORS[4],schedule:"",meetings:[],grading:null};
   return {
     schema: SCHEMA_VERSION,
     settings: {name:"Miguel", scheme:"auto", shareId:uid()},
@@ -904,6 +928,11 @@ function migrate(data){
     data.classes.forEach(c=>{ c.meetings = parseScheduleString(c.schedule||""); });
     data.plans = data.plans || [];
     data.schema = 12;
+  }
+  if(data.schema === 12){
+    // v13: per-class grading (null = not set up)
+    data.classes.forEach(c=>{ c.grading = null; });
+    data.schema = 13;
   }
   return data;
 }
@@ -1587,6 +1616,160 @@ function renderDayPlan(){
     if(tl && nowMin>=rangeStart && nowMin<=rangeEnd) tl.scrollTop = Math.max(0, (nowMin-rangeStart)*PX - tl.clientHeight/2);
     dayPlanScrolled = true;
   }
+}
+
+/* ---------- grades: current grade + what-do-I-need-on-the-final (v0.17) ---------- */
+const LETTERS = [[93,"A"],[90,"A-"],[87,"B+"],[83,"B"],[80,"B-"],[77,"C+"],[73,"C"],[70,"C-"],[67,"D+"],[63,"D"],[60,"D-"],[0,"F"]];
+function letterGrade(pct){ if(pct==null) return ""; for(const [min,L] of LETTERS) if(pct>=min) return L; return "F"; }
+function fmtPct(n){ return n.toFixed(1)+"%"; }
+function catAvg(cat){
+  let got=0, max=0;
+  cat.scores.forEach(s=>{ got+=s.got; max+=s.max; });
+  return max>0 ? got/max*100 : null;
+}
+function weightSum(cats){ return cats.reduce((a,c)=>a+Number(c.weight||0),0); }
+function currentGrade(g){
+  if(!g) return null;
+  const scored = g.cats.filter(c=>catAvg(c)!==null);
+  const wsum = weightSum(scored);
+  if(!wsum) return null;
+  return scored.reduce((a,c)=>a+catAvg(c)*Number(c.weight||0),0)/wsum;
+}
+function finalOutlook(g){
+  // wF = final's weight share; cur = current grade over non-final scored cats (scoreless ones assumed to finish at cur)
+  const fc = g.cats.find(c=>c.isFinal);
+  if(!fc) return null;
+  const wF = Number(fc.weight||0)/100;
+  const rest = g.cats.filter(c=>!c.isFinal && catAvg(c)!==null);
+  const wsum = weightSum(rest);
+  const cur = wsum ? rest.reduce((a,c)=>a+catAvg(c)*Number(c.weight||0),0)/wsum : 0;
+  if(wF<=0) return {wF:0, cur, needed:null, best:null};
+  return {wF, cur, needed:(g.target-cur*(1-wF))/wF, best:cur*(1-wF)+100*wF};
+}
+
+let selectedGradeClass = null;
+function currentGradeClass(){ return selectedGradeClass ? classById(selectedGradeClass) : null; }
+function ensureGradingSelection(){
+  if(!selectedGradeClass || !classById(selectedGradeClass)) selectedGradeClass = state.classes[0] ? state.classes[0].id : null;
+}
+function setupGrading(){
+  const c = currentGradeClass(); if(!c) return;
+  c.grading = {target:90, cats:[]};
+  save(); render();
+}
+function setTarget(v){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  const t = Math.round(parseFloat(v));
+  c.grading.target = (t>0 && t<=100) ? t : 90;
+  save(); render();
+}
+function addCat(name, weight){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  const w = parseFloat(weight);
+  if(!name.trim() || !(w>0)) return;
+  c.grading.cats.push({id:uid(), name:name.trim(), weight:w, isFinal:false, scores:[]});
+  save(); render();
+}
+function delCat(catId){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  const cat = c.grading.cats.find(x=>x.id===catId); if(!cat) return;
+  if(!confirm(`Delete "${cat.name}"${cat.scores.length?` and its ${cat.scores.length} score${cat.scores.length!==1?"s":""}`:""}?`)) return;
+  c.grading.cats = c.grading.cats.filter(x=>x.id!==catId);
+  save(); render();
+}
+function setFinalCat(catId){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  c.grading.cats.forEach(x=>{ x.isFinal = x.id===catId ? !x.isFinal : false; });
+  save(); render();
+}
+function addScore(catId, label, got, max){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  const cat = c.grading.cats.find(x=>x.id===catId); if(!cat) return;
+  const g = parseFloat(got), m = parseFloat(max);
+  if(!(m>0) || !(g>=0)) return;
+  cat.scores.push({id:uid(), label:(label||"").trim()||"Score", got:g, max:m});
+  save(); render();
+}
+function delScore(catId, scoreId){
+  const c = currentGradeClass(); if(!c || !c.grading) return;
+  const cat = c.grading.cats.find(x=>x.id===catId); if(!cat) return;
+  cat.scores = cat.scores.filter(x=>x.id!==scoreId);
+  save(); render();
+}
+
+function renderGrades(){
+  ensureGradingSelection();
+  $("#gradeClassChips").innerHTML = state.classes.length ? state.classes.map(c=>{
+    const cur = c.grading ? currentGrade(c.grading) : null;
+    return `<button data-gsel="${c.id}" class="${selectedGradeClass===c.id?"on":""}">
+      <span class="dot" style="background:${c.color}"></span> ${esc(c.code||c.name)}${cur!=null?` · ${fmtPct(cur)} ${letterGrade(cur)}`:""}</button>`;
+  }).join("") : "";
+
+  const c = currentGradeClass();
+  const el = $("#gradeDetail");
+  if(!c){ el.innerHTML = `<div class="empty">Add a class in Assignments, then come back here.</div>`; return; }
+
+  if(!c.grading){
+    el.innerHTML = `<div class="card panel">
+      <h3>Set up grading for ${esc(c.name)}</h3>
+      <p class="f-sub">Add categories from your syllabus — homework, midterm, final, participation…</p>
+      <button class="btn primary" data-gsetup="1">Add first category</button>
+    </div>`;
+    return;
+  }
+
+  const g = c.grading;
+  const cur = currentGrade(g);
+  const fo = finalOutlook(g);
+  const wsum = weightSum(g.cats);
+
+  let neededBlock;
+  if(!fo) neededBlock = `<div class="s-value" style="font-size:16px">—</div><div class="s-sub">Mark a category FINAL to see this</div>`;
+  else if(fo.needed===null) neededBlock = `<div class="s-value" style="font-size:16px">—</div><div class="s-sub">Final category has 0% weight</div>`;
+  else if(fo.needed<=0) neededBlock = `<div class="s-value" style="color:var(--green)">Secured 🎉</div>`;
+  else if(fo.needed>100) neededBlock = `<div class="s-value" style="color:var(--flag);font-size:16px">Not reachable</div><div class="s-sub">Target ${g.target}% — best case ${fmtPct(fo.best)}</div>`;
+  else neededBlock = `<div class="s-value" style="color:${fo.needed<=(cur||0)?"var(--green)":"var(--amber)"}">${fmtPct(fo.needed)}</div><div class="s-sub">on the final</div>`;
+
+  el.innerHTML = `
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card stat"><div class="s-label">CURRENT GRADE</div>
+        <div class="s-value">${cur!=null?fmtPct(cur):"—"}${cur!=null?` <span style="font-size:16px;color:var(--ink-soft)">${letterGrade(cur)}</span>`:""}</div>
+        <div class="s-sub">${cur!=null?"grade so far":"no scores yet"}</div></div>
+      <div class="card stat"><div class="s-label">TARGET</div>
+        <div class="s-value"><input type="number" id="gTarget" class="budget-input" style="width:46px" value="${g.target}" min="1" max="100">%</div>
+        <div class="s-sub">type a number to change it</div></div>
+      <div class="card stat"><div class="s-label">NEEDED ON FINAL</div>${neededBlock}</div>
+    </div>
+    ${(g.cats.length && wsum!==100)?`<div class="hint" style="color:var(--flag)">Weights sum to ${wsum}% (not 100%) — current grade is normalized to what's entered, but double-check your syllabus.</div>`:""}
+    <div class="card" style="padding:16px 18px;margin-top:14px">
+      ${g.cats.length ? g.cats.map(cat=>{
+        const avg = catAvg(cat);
+        return `<div class="gcat-row">
+          <div class="gcat-head">
+            <b>${esc(cat.name)}</b>
+            <span class="t-cls">${cat.weight}%</span>
+            <button class="chip ${cat.isFinal?"gold":"todo"}" data-gfinal="${cat.id}">FINAL</button>
+            <span class="gcat-avg">${avg!=null?fmtPct(avg):"no scores yet"}</span>
+            <button class="x" data-gdelcat="${cat.id}" title="Delete category" style="margin-left:auto">✕</button>
+          </div>
+          <div class="gcat-scores">
+            ${cat.scores.map(s=>`<span class="chip todo">${s.got}/${s.max} ${esc(s.label)}<button class="gscore-del" data-gdelscore="${cat.id}:${s.id}" title="Delete score">✕</button></span>`).join("")}
+          </div>
+          <div class="form-row" style="margin:8px 0 0">
+            <input type="text" class="gScoreLabel" placeholder="Label" style="max-width:110px">
+            <input type="number" class="gScoreGot" placeholder="Got" style="max-width:80px">
+            <input type="number" class="gScoreMax" placeholder="Max" style="max-width:80px">
+            <button class="btn" data-gaddscore="${cat.id}">Add score</button>
+          </div>
+        </div>`;
+      }).join("") : `<div class="empty">No categories yet — add one below.</div>`}
+      <div class="form-row" style="margin-top:14px">
+        <input type="text" id="gCatName" placeholder="Category (e.g. Quizzes)" style="max-width:160px">
+        <input type="number" id="gCatWeight" placeholder="Weight %" style="max-width:100px">
+        <button class="btn primary" data-gaddcat="1">Add category</button>
+      </div>
+    </div>`;
+  $("#gTarget").addEventListener("change", e=>setTarget(e.target.value));
 }
 
 /* ---------- rendering ---------- */
@@ -2287,7 +2470,7 @@ function renderSettings(){
 
 const renderers = {today:renderToday, tasks:renderTasks, progress:renderProgress, habits:renderHabits,
                    notes:renderNotes, apps:renderApps, friends:renderFriends, money:renderMoney,
-                   reflect:renderReflect, faith:renderFaith, settings:renderSettings};
+                   grades:renderGrades, reflect:renderReflect, faith:renderFaith, settings:renderSettings};
 function render(){ renderers[activeView](); renderSideFoot(); }
 function switchView(v){
   activeView = v;
@@ -2301,7 +2484,7 @@ function switchView(v){
 const PAL_VIEWS = [
   ["today","Today","🏠"],["tasks","Assignments","📚"],["progress","Progress","📈"],
   ["habits","Habits","🔁"],["notes","Notes","📝"],["apps","Internships","🚀"],
-  ["friends","Friends","👥"],["money","Money","💸"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
+  ["friends","Friends","👥"],["money","Money","💸"],["grades","Grades","📊"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
 ];
 let palSel = 0, palList = [];
 function palOpen(){ $("#palOverlay").style.display="flex"; const i=$("#palInput"); i.value=""; palBuild(""); i.focus(); }
@@ -2429,6 +2612,16 @@ document.body.addEventListener("click",e=>{
   const clsd = e.target.closest("[data-cday]"); if(clsd){ const i=Number(clsd.dataset.cday); newClassDays = newClassDays.includes(i) ? newClassDays.filter(x=>x!==i) : [...newClassDays,i]; renderTasks(); return; }
   const upl = e.target.closest("[data-unplan]");if(upl) return removePlan(upl.dataset.unplan);
   const pln = e.target.closest("[data-plan]");  if(pln) return planTask(pln.dataset.plan);
+  const gsel = e.target.closest("[data-gsel]"); if(gsel){ selectedGradeClass = gsel.dataset.gsel; renderGrades(); return; }
+  const gsu  = e.target.closest("[data-gsetup]");if(gsu) return setupGrading();
+  const gfin = e.target.closest("[data-gfinal]");if(gfin) return setFinalCat(gfin.dataset.gfinal);
+  const gdc  = e.target.closest("[data-gdelcat]");if(gdc) return delCat(gdc.dataset.gdelcat);
+  const gds  = e.target.closest("[data-gdelscore]");if(gds){ const [catId,scoreId]=gds.dataset.gdelscore.split(":"); return delScore(catId,scoreId); }
+  const gas  = e.target.closest("[data-gaddscore]");if(gas){
+    const row = gas.closest(".form-row");
+    return addScore(gas.dataset.gaddscore, row.querySelector(".gScoreLabel").value, row.querySelector(".gScoreGot").value, row.querySelector(".gScoreMax").value);
+  }
+  const gac  = e.target.closest("[data-gaddcat]");if(gac) return addCat($("#gCatName").value, $("#gCatWeight").value);
 });
 $("#focusMini").addEventListener("click",()=>switchView("today"));
 document.body.addEventListener("change",e=>{
@@ -2485,6 +2678,16 @@ $("#pAdd").addEventListener("click",()=>{ addPrayer($("#pText").value); $("#pTex
 $("#pText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#pAdd").click(); });
 $("#vAdd").addEventListener("click",()=>{ addVerse($("#vRef").value, $("#vText").value); $("#vRef").value=""; $("#vText").value=""; });
 $("#vText").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#vAdd").click(); });
+document.body.addEventListener("keydown",e=>{
+  if(e.key!=="Enter") return;
+  if(e.target.matches(".gScoreLabel,.gScoreGot,.gScoreMax")){
+    const btn = e.target.closest(".form-row").querySelector("[data-gaddscore]");
+    if(btn) btn.click();
+  } else if(e.target.id==="gCatName" || e.target.id==="gCatWeight"){
+    const btn = document.querySelector("[data-gaddcat]");
+    if(btn) btn.click();
+  }
+});
 $("#mAdd").addEventListener("click",()=>{
   addTx($("#mAmount").value, $("#mCat").value, $("#mNote").value, $("#mDate").value);
   $("#mAmount").value=""; $("#mNote").value="";
