@@ -161,6 +161,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .nudge{display:block;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--gold-soft);color:#8A6E12;font-size:13px;border:0;width:100%;text-align:left}
 .nudge:hover{filter:brightness(.97)}
 .streak{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600}
+.plan-btn{border:1px solid var(--line);background:var(--card);border-radius:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;padding:3px 8px;color:var(--ink-soft);margin-left:6px;white-space:nowrap}
+.plan-btn:hover{border-color:var(--green);color:var(--green)}
+.timeline{position:relative;max-height:420px;overflow-y:auto;margin-top:4px}
+.tl-hour{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.tl-hour-label{position:absolute;left:0;font-family:var(--mono);font-size:9.5px;color:var(--ink-soft)}
+.tl-block{position:absolute;left:44px;right:6px;border-radius:8px;padding:3px 8px;font-size:11.5px;line-height:1.35;overflow:hidden}
+.tl-block.tl-class{border-left:4px solid var(--line)}
+.tl-block.tl-plan{background:var(--green-soft);border:1px solid var(--green);display:flex;align-items:center;gap:6px}
+.tl-block.tl-plan.done{opacity:.55}
+.tl-block.tl-plan.done .tl-plan-title{text-decoration:line-through}
+.tl-plan-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-unplan{border:0;background:none;color:var(--ink-soft);opacity:.5;font-size:12px;flex-shrink:0;padding:0 2px}
+.tl-unplan:hover{opacity:1;color:var(--flag)}
+.tl-now{position:absolute;left:44px;right:6px;height:2px;background:var(--flag)}
+.tl-now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--flag)}
 
 /* ---------- Habits ---------- */
 .habit-table{width:100%;border-collapse:collapse}
@@ -466,6 +481,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
       </div>
       <div class="g-stats" id="gStats"></div>
     </div>
+    <div class="card" id="dayPlan"></div>
     <div class="today-grid">
       <div class="card panel">
         <h3>Due soon <span class="count">next 7 days</span></h3>
@@ -509,6 +525,9 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
       <input type="text" id="cCode" placeholder="Code (optional)" style="max-width:130px">
       <input type="text" id="cSched" placeholder="Schedule (e.g. MWF 10am)" style="max-width:170px">
       <div class="color-row" id="cColors"></div>
+      <div class="color-row" id="cDayToggles"></div>
+      <input type="time" id="cStart" title="Meeting start time" style="max-width:100px">
+      <input type="time" id="cEnd" title="Meeting end time" style="max-width:100px">
       <button class="btn primary" id="cAdd">Add class</button>
     </div>
     <div class="filters" id="classFilters"></div>
@@ -723,7 +742,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -763,10 +782,10 @@ function classById(id){ return state.classes.find(c=>c.id===id) || null; }
 /* ---------- state ---------- */
 function seed(){
   const t = new Date(), plus = n => {const d=new Date(t);d.setDate(t.getDate()+n);return dateStr(d);};
-  const cCS   = {id:uid(),name:"CS 101",code:"CS101",color:CLASS_COLORS[0],schedule:"MWF 10am"};
-  const cMath = {id:uid(),name:"Math",  code:"",     color:CLASS_COLORS[1],schedule:""};
-  const cCar  = {id:uid(),name:"Career",code:"",     color:CLASS_COLORS[3],schedule:""};
-  const cLife = {id:uid(),name:"Life",  code:"",     color:CLASS_COLORS[4],schedule:""};
+  const cCS   = {id:uid(),name:"CS 101",code:"CS101",color:CLASS_COLORS[0],schedule:"MWF 10am",meetings:[{days:[0,2,4],start:"10:00",end:"10:50"}]};
+  const cMath = {id:uid(),name:"Math",  code:"",     color:CLASS_COLORS[1],schedule:"",meetings:[{days:[1,3],start:"13:00",end:"14:15"}]};
+  const cCar  = {id:uid(),name:"Career",code:"",     color:CLASS_COLORS[3],schedule:"",meetings:[]};
+  const cLife = {id:uid(),name:"Life",  code:"",     color:CLASS_COLORS[4],schedule:"",meetings:[]};
   return {
     schema: SCHEMA_VERSION,
     settings: {name:"Miguel", scheme:"auto", shareId:uid()},
@@ -802,6 +821,7 @@ function seed(){
       {id:uid(),date:plus(-2),amount:5.99,cat:"subs",note:"Spotify student"},
       {id:uid(),date:plus(-3),amount:150,cat:"income",note:"Tutoring"}
     ]},
+    plans: [],
     reflections: [],
     prayers: [],
     verses: [
@@ -879,6 +899,12 @@ function migrate(data){
     data.money = data.money || {budget:0, txs:[]};
     data.schema = 11;
   }
+  if(data.schema === 11){
+    // v12: class meetings (parsed best-effort from the legacy schedule text) + planned blocks
+    data.classes.forEach(c=>{ c.meetings = parseScheduleString(c.schedule||""); });
+    data.plans = data.plans || [];
+    data.schema = 12;
+  }
   return data;
 }
 
@@ -887,6 +913,8 @@ function load(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
     state = raw ? migrate(JSON.parse(raw)) : seed();
+    const cutoff = dateStr(new Date(Date.now()-14*86400000));
+    state.plans = (state.plans||[]).filter(p=>p.date>=cutoff);
     save();
   }catch(e){
     storageOK = false;
@@ -907,10 +935,15 @@ function addTask(title, classId, due, priority){
   save(); render();
 }
 let newClassColor = CLASS_COLORS[0];
+let newClassDays = [];
 function addClass(name, code, schedule){
   if(!name.trim()) return;
   if(state.classes.some(c=>c.name.toLowerCase()===name.trim().toLowerCase())) return;
-  state.classes.push({id:uid(),name:name.trim(),code:code.trim(),color:newClassColor,schedule:schedule.trim()});
+  const start = $("#cStart").value, end = $("#cEnd").value;
+  const meetings = (newClassDays.length && start && end && end>start)
+    ? [{days:newClassDays.slice().sort((a,b)=>a-b), start, end}] : [];
+  state.classes.push({id:uid(),name:name.trim(),code:code.trim(),color:newClassColor,schedule:schedule.trim(),meetings});
+  newClassDays = [];
   save(); render();
 }
 function deleteClass(id){
@@ -928,7 +961,11 @@ function cycleStatus(id){
   if(t.status==="done") t.completed = todayStr(); else delete t.completed;
   save(); render();
 }
-function deleteTask(id){ state.tasks = state.tasks.filter(t=>t.id!==id); save(); render(); }
+function deleteTask(id){
+  state.tasks = state.tasks.filter(t=>t.id!==id);
+  state.plans = state.plans.filter(p=>p.taskId!==id);
+  save(); render();
+}
 
 /* ---------- actions: habits ---------- */
 function addHabit(name){
@@ -1412,6 +1449,146 @@ function renderNlPreview(raw){
   el.style.display = "flex";
 }
 
+/* ---------- schedule-aware Today: plan my day (v0.16) ---------- */
+const SCHED_DOW_TOKENS = [
+  ["sunday",6],["monday",0],["tuesday",1],["wednesday",2],["thursday",3],["friday",4],["saturday",5],
+  ["sun",6],["mon",0],["tue",1],["wed",2],["thu",3],["fri",4],["sat",5],
+  ["su",6],["tu",1],["th",3],["sa",5],
+  ["m",0],["t",1],["w",2],["r",3],["f",4]
+];
+const SCHED_DOW_RE = new RegExp(SCHED_DOW_TOKENS.map(t=>t[0]).join("|"),"g");
+const SCHED_DOW_MAP = Object.fromEntries(SCHED_DOW_TOKENS);
+function hmToMin(hm){ const [h,m] = hm.split(":").map(Number); return h*60+m; }
+function minToHM(min){ min = ((min%1440)+1440)%1440; return pad(Math.floor(min/60))+":"+pad(min%60); }
+function parseScheduleString(s){
+  if(!s) return [];
+  const str = s.toLowerCase();
+  const tm = /(\d{1,2})(:(\d{2}))?\s*(am|pm)?/.exec(str);
+  if(!tm) return [];
+  let hh = Number(tm[1]);
+  const mm = Number(tm[3]||0), ap = tm[4];
+  if(hh>23 || mm>59) return [];
+  if(ap==="pm" && hh<12) hh += 12;
+  if(ap==="am" && hh===12) hh = 0;
+  if(!ap && hh>=1 && hh<=7) hh += 12; // bare small hour, no am/pm: assume afternoon class
+  const start = minToHM(hh*60+mm);
+  const end = minToHM(hh*60+mm+60);
+  const daysPart = str.slice(0, tm.index);
+  const days = new Set();
+  SCHED_DOW_RE.lastIndex = 0;
+  let m;
+  while((m = SCHED_DOW_RE.exec(daysPart))) days.add(SCHED_DOW_MAP[m[0]]);
+  return days.size ? [{days:[...days].sort((a,b)=>a-b), start, end}] : [];
+}
+function meetingsOn(ds){
+  const [y,mo,d] = ds.split("-").map(Number);
+  const dow = (new Date(y,mo-1,d).getDay()+6)%7;
+  const out = [];
+  state.classes.forEach(c=>{
+    (c.meetings||[]).forEach(mt=>{ if(mt.days.includes(dow)) out.push({class:c, start:hmToMin(mt.start), end:hmToMin(mt.end)}); });
+  });
+  return out;
+}
+function dayItems(ds){
+  const items = meetingsOn(ds).map(m=>({type:"class", start:m.start, end:m.end, name:m.class.name, color:m.class.color}));
+  state.plans.filter(p=>p.date===ds).forEach(p=>{
+    items.push({type:"plan", id:p.id, taskId:p.taskId, start:hmToMin(p.start), end:hmToMin(p.start)+p.mins});
+  });
+  return items.sort((a,b)=>a.start-b.start);
+}
+function freeGaps(ds, fromMin, toMin){
+  const busy = dayItems(ds).map(i=>[i.start,i.end]).sort((a,b)=>a[0]-b[0]);
+  const gaps = []; let cur = fromMin;
+  busy.forEach(([s,e])=>{
+    if(s>cur) gaps.push([cur, Math.min(s,toMin)]);
+    cur = Math.max(cur, e);
+  });
+  if(cur<toMin) gaps.push([cur, toMin]);
+  return gaps.filter(([s,e])=>e>s);
+}
+function freeTimeToday(){
+  const now = new Date(), nowMin = now.getHours()*60+now.getMinutes();
+  if(nowMin>=22*60) return 0;
+  return freeGaps(todayStr(), nowMin, 22*60).filter(([s,e])=>e-s>=15).reduce((a,[s,e])=>a+(e-s),0);
+}
+function planTask(taskId){
+  const td = todayStr();
+  const now = new Date(), nowMin = now.getHours()*60+now.getMinutes();
+  state.plans = state.plans.filter(p=>!(p.date===td && p.taskId===taskId));
+  const gaps = freeGaps(td, nowMin, 22*60).filter(([s,e])=>e-s>=30);
+  let start, mins;
+  if(gaps.length){ [start] = gaps[0]; mins = Math.min(60, gaps[0][1]-gaps[0][0]); }
+  else {
+    const items = dayItems(td);
+    start = items.length ? Math.max(...items.map(i=>i.end)) : Math.max(nowMin, 8*60);
+    mins = 60;
+  }
+  state.plans.push({id:uid(), date:td, taskId, start:minToHM(start), mins});
+  save(); render();
+}
+function removePlan(id){ state.plans = state.plans.filter(p=>p.id!==id); save(); render(); }
+
+let dayPlanScrolled = false;
+function renderDayPlan(){
+  const el = $("#dayPlan"); if(!el) return;
+  const td = todayStr(), now = new Date();
+  const items = dayItems(td);
+  if(!items.length){
+    const weekend = now.getDay()===0 || now.getDay()===6;
+    el.innerHTML = `<div class="panel"><h3>Today's plan</h3>
+      <div class="empty">${weekend ? "Nothing scheduled — enjoy it 🌿"
+        : "No schedule yet — add class times in Assignments → ＋ class, or plan a task from Due soon."}</div></div>`;
+    return;
+  }
+  const nowMin = now.getHours()*60+now.getMinutes();
+  const firstMin = Math.min(...items.map(i=>i.start)), lastMin = Math.max(...items.map(i=>i.end));
+  const rangeStart = Math.min(8*60, firstMin-60), rangeEnd = Math.max(20*60, lastMin+60);
+  const PX = 0.75;
+  const height = (rangeEnd-rangeStart)*PX;
+
+  const sorted = items.slice().sort((a,b)=>a.start-b.start);
+  const laneEnd = [];
+  sorted.forEach(it=>{
+    let lane = 0;
+    while(lane<laneEnd.length && laneEnd[lane]>it.start) lane++;
+    laneEnd[lane] = it.end;
+    it._offset = lane*12;
+  });
+
+  let hourLines = "";
+  for(let hr=Math.ceil(rangeStart/60); hr<=Math.floor(rangeEnd/60); hr++){
+    const top = (hr*60-rangeStart)*PX;
+    const label = hr===0?"12a":hr<12?hr+"a":hr===12?"12p":(hr-12)+"p";
+    hourLines += `<div class="tl-hour" style="top:${top}px"></div><div class="tl-hour-label" style="top:${top-6}px">${label}</div>`;
+  }
+
+  const blocks = sorted.map(it=>{
+    const top = (it.start-rangeStart)*PX, h = Math.max((it.end-it.start)*PX, 16);
+    if(it.type==="class"){
+      return `<div class="tl-block tl-class" style="top:${top}px;height:${h}px;margin-left:${it._offset}px;border-left-color:${it.color};background:color-mix(in srgb, ${it.color} 15%, var(--card))">
+        <b>${esc(it.name)}</b><br>${minToHM(it.start)}–${minToHM(it.end)}</div>`;
+    }
+    const t = state.tasks.find(x=>x.id===it.taskId);
+    const done = t && t.status==="done";
+    return `<div class="tl-block tl-plan ${done?"done":""}" style="top:${top}px;height:${h}px;margin-left:${it._offset}px">
+      <span class="tl-plan-title">${esc(t?t.title:"(deleted task)")}</span>
+      <button class="tl-unplan" data-unplan="${it.id}" title="Unplan">✕</button></div>`;
+  }).join("");
+
+  const nowLine = (nowMin>=rangeStart && nowMin<=rangeEnd) ? `<div class="tl-now" style="top:${(nowMin-rangeStart)*PX}px"></div>` : "";
+
+  el.innerHTML = `<div class="panel" style="padding-bottom:10px">
+    <h3>Today's plan</h3>
+    <div class="timeline" id="tlScroll"><div style="position:relative;height:${height}px">${hourLines}${blocks}${nowLine}</div></div>
+  </div>`;
+
+  if(!dayPlanScrolled){
+    const tl = $("#tlScroll");
+    if(tl && nowMin>=rangeStart && nowMin<=rangeEnd) tl.scrollTop = Math.max(0, (nowMin-rangeStart)*PX - tl.clientHeight/2);
+    dayPlanScrolled = true;
+  }
+}
+
 /* ---------- rendering ---------- */
 let activeView = "today";
 let taskFilter = "all";
@@ -1424,15 +1601,17 @@ function statusChip(t){
     <span class="chip ${t.status}">${t.status.toUpperCase()}</span></button>`;
 }
 function priChip(p){ return `<span class="chip ${p}">${p.toUpperCase()}</span>`; }
-function taskRow(t){
+function taskRow(t, showPlan){
   const overdue = t.due && t.due < todayStr() && t.status!=="done";
   const c = classById(t.classId);
+  const planned = showPlan && state.plans.some(p=>p.date===todayStr() && p.taskId===t.id);
   return `<div class="task">
     ${statusChip(t)}
     <span class="t-title ${t.status==="done"?"done-text":""}">${esc(t.title)}
       ${c?`<span class="t-cls"> · <span class="dot" style="background:${c.color}"></span> ${esc(c.name)}</span>`:""}</span>
     ${priChip(t.priority)}
     <span class="t-due">${overdue?`<span class="chip overdue">${fmtDue(t.due)}</span>`:fmtDue(t.due)}</span>
+    ${showPlan?`<button class="plan-btn" data-plan="${t.id}">${planned?"↻ Replan":"＋ Plan"}</button>`:""}
     <button class="x" data-del="${t.id}" title="Delete">✕</button>
   </div>`;
 }
@@ -1450,10 +1629,13 @@ function renderToday(){
   const dueHabits = state.habits.filter(hb=>habitDue(hb, now));
   const habitsDone = dueHabits.filter(hb=>hb.log[td]).length;
   const ft = focusToday();
+  const freeMin = freeTimeToday();
   $("#gStats").innerHTML =
     `<b>${open.length}</b> open task${open.length!==1?"s":""}${overdue?` · <b style="color:#F1A583">${overdue}</b> overdue`:""}<br>` +
-    `habits today <b>${habitsDone}/${dueHabits.length}</b>${ft.mins?` · focus <b>${ft.mins}m</b>`:""}`;
+    `habits today <b>${habitsDone}/${dueHabits.length}</b>${ft.mins?` · focus <b>${ft.mins}m</b>`:""}` +
+    (freeMin>0 ? `<br>🕐 <b>${(freeMin/60).toFixed(1)}h</b> free` : "");
 
+  renderDayPlan();
   renderFocusPanel();
 
   const horizon = new Date(now); horizon.setDate(now.getDate()+7);
@@ -1461,7 +1643,7 @@ function renderToday(){
     .filter(t=>t.status!=="done" && t.due && t.due<=dateStr(horizon))
     .sort((a,b)=>a.due.localeCompare(b.due));
   $("#dueList").innerHTML = due.length
-    ? due.map(taskRow).join("")
+    ? due.map(t=>taskRow(t,true)).join("")
     : `<div class="empty">Nothing due this week. Go touch grass 🌱</div>`;
 
   $("#todayHabits").innerHTML = dueHabits.length
@@ -1499,6 +1681,8 @@ function renderTasks(){
 
   $("#cColors").innerHTML = CLASS_COLORS.map(col=>
     `<button class="swc ${newClassColor===col?"on":""}" data-ccolor="${col}" style="background:${col}" aria-label="class color"></button>`).join("");
+  $("#cDayToggles").innerHTML = DAY_LETTERS.map((L,i)=>
+    `<button class="day-tgl ${newClassDays.includes(i)?"on":""}" data-cday="${i}">${L}</button>`).join("");
 
   // view tabs + container visibility
   document.querySelectorAll("#taskViewTabs button").forEach(b=>b.classList.toggle("on", b.dataset.tv===taskView));
@@ -1522,7 +1706,7 @@ function renderTasks(){
       if(b.status==="done"&&a.status!=="done") return -1;
       return (a.due||"9999").localeCompare(b.due||"9999");
     });
-  $("#taskList").innerHTML = list.length ? list.map(taskRow).join("") : `<div class="empty">No tasks here.</div>`;
+  $("#taskList").innerHTML = list.length ? list.map(t=>taskRow(t)).join("") : `<div class="empty">No tasks here.</div>`;
 }
 
 const TASK_COLS = ["todo","doing","done"];
@@ -2107,6 +2291,7 @@ const renderers = {today:renderToday, tasks:renderTasks, progress:renderProgress
 function render(){ renderers[activeView](); renderSideFoot(); }
 function switchView(v){
   activeView = v;
+  if(v==="today") dayPlanScrolled = false;
   document.querySelectorAll(".view").forEach(el=>el.classList.toggle("active", el.id==="view-"+v));
   document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
   render();
@@ -2241,6 +2426,9 @@ document.body.addEventListener("click",e=>{
   const fsp = e.target.closest("[data-fstop]"); if(fsp) return focusEnd(false);
   const txd = e.target.closest("[data-txdel]"); if(txd) return deleteTx(txd.dataset.txdel);
   const mcf = e.target.closest("[data-mcf]");   if(mcf){ moneyCatFilter = mcf.dataset.mcf; renderMoney(); return; }
+  const clsd = e.target.closest("[data-cday]"); if(clsd){ const i=Number(clsd.dataset.cday); newClassDays = newClassDays.includes(i) ? newClassDays.filter(x=>x!==i) : [...newClassDays,i]; renderTasks(); return; }
+  const upl = e.target.closest("[data-unplan]");if(upl) return removePlan(upl.dataset.unplan);
+  const pln = e.target.closest("[data-plan]");  if(pln) return planTask(pln.dataset.plan);
 });
 $("#focusMini").addEventListener("click",()=>switchView("today"));
 document.body.addEventListener("change",e=>{
@@ -2265,6 +2453,7 @@ $("#tAdd").addEventListener("click",()=>{
 $("#cAdd").addEventListener("click",()=>{
   addClass($("#cName").value, $("#cCode").value, $("#cSched").value);
   $("#cName").value=""; $("#cCode").value=""; $("#cSched").value="";
+  $("#cStart").value=""; $("#cEnd").value="";
   $("#clsForm").style.display = "none";
 });
 $("#cName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#cAdd").click(); });
