@@ -465,6 +465,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
     <button data-view="progress">Progress <span class="key">3</span></button>
     <button data-view="habits">Habits <span class="key">4</span></button>
     <button data-view="notes">Notes <span class="key">5</span></button>
+    <button data-view="study">Study</button>
     <button data-view="apps">Internships <span class="key">6</span></button>
     <button data-view="friends">Friends <span class="key">7</span></button>
     <button data-view="money">Money</button>
@@ -506,6 +507,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
           <div id="todayHabits"></div>
           <button class="nudge" id="reflectNudge" style="display:none">🌙 You haven't reflected today — takes two minutes.</button>
           <button class="nudge" id="recapNudge" style="display:none">🗓 Sunday wrap-up — your week in review is ready.</button>
+          <button class="nudge" id="studyNudge" style="display:none"></button>
         </div>
       </div>
     </div>
@@ -597,6 +599,14 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
       </div>
       <div class="card note-editor" id="noteEditor"></div>
     </div>
+  </section>
+
+  <!-- STUDY -->
+  <section class="view" id="view-study">
+    <div class="view-head">
+      <div><div class="eyebrow">RETRIEVAL PRACTICE</div><h1>Study</h1><div class="subtitle">Flashcards, straight from your notes.</div></div>
+    </div>
+    <div id="studyBody"></div>
   </section>
 
   <!-- INTERNSHIPS -->
@@ -761,7 +771,7 @@ html[data-theme="dark"] .cal-pill.app{color:#D8BC5A}
    Pattern: event → action mutates state → save() → render()
    ========================================================= */
 
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 const STORE_KEY = "campus-os-data";
 let storageOK = true;
 
@@ -829,7 +839,7 @@ function seed(){
       {id:uid(),title:"Welcome to Campus OS",updated:new Date().toISOString(),
        body:"# Your workspace #guide\n\nNotes work like Obsidian-lite:\n- Link notes with [[Big-O Cheat Sheet]] — click a link to jump (or create it)\n- Tag with #cs101 or #internship, then filter by tag on the left\n- **Bold**, `inline code`, # headings, and - lists render in Preview\n\nCode blocks too:\n\n```\nfunction hello(name) {\n  return `hey ${name}`;\n}\n```\n\nHit Preview to see it rendered. Linked mentions show at the bottom."},
       {id:uid(),title:"Big-O Cheat Sheet",updated:new Date().toISOString(),
-       body:"# Big-O quick reference #cs101\n\n- O(1) — hash lookup\n- O(log n) — binary search\n- O(n) — single loop\n- O(n log n) — good sorts\n- O(n²) — nested loops\n\nSee [[Welcome to Campus OS]] for how notes work."}
+       body:"# Big-O quick reference #cs101\n\n- O(1) — hash lookup\n- O(log n) — binary search\n- O(n) — single loop\n- O(n log n) — good sorts\n- O(n²) — nested loops\n\nSee [[Welcome to Campus OS]] for how notes work.\n\nQ: What's the Big-O of binary search?\nA: O(log n)\n\nQ: What's the Big-O of a single loop over n items?\nA: O(n)"}
     ],
     apps: [
       {id:uid(),company:"Stripe",role:"SWE Intern (Summer '27)",status:"wishlist",deadline:plus(20),link:"https://stripe.com/jobs",notes:"Ask Vic about a referral",created:new Date().toISOString(),updated:todayStr()},
@@ -846,6 +856,7 @@ function seed(){
       {id:uid(),date:plus(-3),amount:150,cat:"income",note:"Tutoring"}
     ]},
     plans: [],
+    cards: {},
     reflections: [],
     prayers: [],
     verses: [
@@ -934,6 +945,11 @@ function migrate(data){
     data.classes.forEach(c=>{ c.grading = null; });
     data.schema = 13;
   }
+  if(data.schema === 13){
+    // v14: flashcard SRS state, keyed by noteId+"|"+question text
+    data.cards = data.cards || {};
+    data.schema = 14;
+  }
   return data;
 }
 
@@ -944,6 +960,8 @@ function load(){
     state = raw ? migrate(JSON.parse(raw)) : seed();
     const cutoff = dateStr(new Date(Date.now()-14*86400000));
     state.plans = (state.plans||[]).filter(p=>p.date>=cutoff);
+    const liveNoteIds = new Set(state.notes.map(n=>n.id));
+    Object.keys(state.cards).forEach(k=>{ if(!liveNoteIds.has(k.split("|")[0])) delete state.cards[k]; });
     save();
   }catch(e){
     storageOK = false;
@@ -1772,6 +1790,130 @@ function renderGrades(){
   $("#gTarget").addEventListener("change", e=>setTarget(e.target.value));
 }
 
+/* ---------- study: flashcards from notes, SM-2-lite (v0.18) ---------- */
+function noteCards(note){
+  const lines = String(note.body).split("\n");
+  const out = [];
+  for(let i=0;i<lines.length;i++){
+    const qm = /^Q:\s*(.+)$/.exec(lines[i]);
+    if(!qm) continue;
+    let j = i+1;
+    while(j<lines.length && lines[j].trim()==="") j++;
+    const am = j<lines.length ? /^A:\s*(.+)$/.exec(lines[j]) : null;
+    if(am){
+      const q = qm[1].trim(), a = am[1].trim();
+      out.push({key: note.id+"|"+q.toLowerCase(), q, a, noteId: note.id, noteTitle: note.title});
+      i = j;
+    }
+  }
+  return out;
+}
+function allCards(){
+  const out = [];
+  state.notes.forEach(n=>out.push(...noteCards(n)));
+  return out;
+}
+function dueCards(){
+  const td = todayStr();
+  return allCards().filter(c=>{ const e = state.cards[c.key]; return !e || e.due<=td; });
+}
+function gradeCard(key, grade){
+  const c = state.cards[key] || (state.cards[key] = {ease:2.5, ivl:0, due:todayStr(), reps:0, lapses:0});
+  if(grade==="again"){ c.ivl = 1; c.ease = Math.max(1.3, c.ease-0.2); c.lapses++; }
+  else if(grade==="hard"){ c.ivl = Math.max(1, Math.round(c.ivl*1.2)); c.ease = Math.max(1.3, c.ease-0.15); }
+  else if(grade==="good"){ c.ivl = c.reps===0 ? 1 : c.reps===1 ? 3 : Math.round(c.ivl*c.ease); }
+  else if(grade==="easy"){ c.ivl = Math.max(2, Math.round(c.ivl*c.ease*1.3)); c.ease += 0.15; }
+  if(grade!=="again") c.reps++;
+  c.ivl = Math.min(365, c.ivl);
+  const d = new Date(); d.setDate(d.getDate()+c.ivl);
+  c.due = dateStr(d);
+  save();
+}
+function nextDueDate(){
+  const td = todayStr();
+  const dates = Object.values(state.cards).map(c=>c.due).filter(d=>d>td).sort();
+  return dates.length ? dates[0] : null;
+}
+
+let studySession = null; // null | {cards,idx,showAnswer} | {done:true, nextDue}
+function startStudy(noteId){
+  const pool = (noteId ? noteCards(state.notes.find(n=>n.id===noteId)) : allCards())
+    .filter(c=>{ const e = state.cards[c.key]; return !e || e.due<=todayStr(); });
+  if(!pool.length) return;
+  const shuffled = pool.slice();
+  for(let i=shuffled.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]]; }
+  studySession = {cards:shuffled, idx:0, showAnswer:false};
+  render();
+}
+function studyGrade(grade){
+  if(!studySession || !studySession.cards) return;
+  gradeCard(studySession.cards[studySession.idx].key, grade);
+  const nextIdx = studySession.idx+1;
+  studySession = nextIdx>=studySession.cards.length
+    ? {done:true, nextDue:nextDueDate()}
+    : {cards:studySession.cards, idx:nextIdx, showAnswer:false};
+  render();
+}
+function endStudy(){ studySession = null; render(); }
+
+function renderStudy(){
+  const el = $("#studyBody");
+
+  if(studySession && studySession.done){
+    el.innerHTML = `<div class="card panel" style="text-align:center;padding:28px 20px">
+      <h3>Done for now 🎉</h3>
+      <p class="f-sub">${studySession.nextDue?`Next cards due ${fmtDue(studySession.nextDue)}.`:"Nothing else scheduled yet — write more Q:/A: pairs in your notes."}</p>
+      <button class="btn primary" data-studyend="1" style="margin-top:6px">Back</button>
+    </div>`;
+    return;
+  }
+
+  if(studySession && studySession.cards){
+    const card = studySession.cards[studySession.idx];
+    el.innerHTML = `<div class="card panel" style="text-align:center;padding:32px 24px">
+      <div class="hint">${studySession.idx+1}/${studySession.cards.length} · ${esc(card.noteTitle)}</div>
+      <div style="font-size:19px;line-height:1.5;min-height:80px;display:flex;align-items:center;justify-content:center">${renderInline(esc(card.q))}</div>
+      ${studySession.showAnswer ? `
+        <div style="font-size:17px;color:var(--green);margin-top:16px;line-height:1.5">${renderInline(esc(card.a))}</div>
+        <div class="focus-row" style="justify-content:center;margin-top:22px">
+          <button class="btn" style="border-color:var(--flag);color:var(--flag)" data-studygrade="again">Again</button>
+          <button class="btn" style="border-color:var(--amber);color:var(--amber)" data-studygrade="hard">Hard</button>
+          <button class="btn" style="border-color:var(--green);color:var(--green)" data-studygrade="good">Good</button>
+          <button class="btn" style="border-color:var(--green-deep);color:var(--green-deep)" data-studygrade="easy">Easy</button>
+        </div>` : `
+        <button class="btn primary" data-studyreveal="1" style="margin-top:20px">Show answer</button>`}
+    </div>
+    <div style="text-align:center;margin-top:12px"><button class="btn" data-studyend="1">End session</button></div>`;
+    return;
+  }
+
+  const due = dueCards(), total = allCards();
+  if(!total.length){
+    el.innerHTML = `<div class="card panel" style="text-align:center;padding:28px 20px">
+      <h3>No flashcards yet</h3>
+      <p class="f-sub">Write <code>Q:</code> / <code>A:</code> line pairs in any note — they become flashcards here.</p>
+      <button class="btn primary" data-studygonotes="1" style="margin-top:6px">Open Notes</button>
+    </div>`;
+    return;
+  }
+  const byNote = {};
+  total.forEach(c=>{ (byNote[c.noteId] = byNote[c.noteId] || {title:c.noteTitle, due:0, total:0}).total++; });
+  due.forEach(c=>{ if(byNote[c.noteId]) byNote[c.noteId].due++; });
+  const noteCount = Object.keys(byNote).length;
+  el.innerHTML = `
+    <div class="card panel" style="text-align:center;padding:28px 20px">
+      <h3 style="font-size:19px">${due.length} card${due.length!==1?"s":""} due · ${total.length} total across ${noteCount} note${noteCount!==1?"s":""}</h3>
+      ${due.length ? `<button class="btn primary" data-studystart="1" style="margin-top:12px">Study now</button>` : `<p class="f-sub" style="margin-top:8px">All caught up 🌿</p>`}
+    </div>
+    <div class="card" style="margin-top:14px">
+      ${Object.entries(byNote).map(([noteId,info])=>`
+        <div class="task" ${info.due?`data-studynote="${noteId}" style="cursor:pointer"`:""}>
+          <span class="t-title">${esc(info.title)}</span>
+          <span class="t-cls">${info.due}/${info.total} due</span>
+        </div>`).join("")}
+    </div>`;
+}
+
 /* ---------- rendering ---------- */
 let activeView = "today";
 let taskFilter = "all";
@@ -1842,6 +1984,10 @@ function renderToday(){
 
   $("#reflectNudge").style.display = (h>=17 && !todayReflection()) ? "block" : "none";
   $("#recapNudge").style.display = (now.getDay()===0 && h>=17) ? "block" : "none";
+  const dueN = dueCards().length;
+  const sn = $("#studyNudge");
+  if(dueN){ sn.textContent = `🧠 ${dueN} card${dueN!==1?"s":""} due — quick review?`; sn.style.display = "block"; }
+  else sn.style.display = "none";
 }
 
 function renderTasks(){
@@ -2469,7 +2615,7 @@ function renderSettings(){
 }
 
 const renderers = {today:renderToday, tasks:renderTasks, progress:renderProgress, habits:renderHabits,
-                   notes:renderNotes, apps:renderApps, friends:renderFriends, money:renderMoney,
+                   notes:renderNotes, study:renderStudy, apps:renderApps, friends:renderFriends, money:renderMoney,
                    grades:renderGrades, reflect:renderReflect, faith:renderFaith, settings:renderSettings};
 function render(){ renderers[activeView](); renderSideFoot(); }
 function switchView(v){
@@ -2483,7 +2629,7 @@ function switchView(v){
 /* ---------- command palette ---------- */
 const PAL_VIEWS = [
   ["today","Today","🏠"],["tasks","Assignments","📚"],["progress","Progress","📈"],
-  ["habits","Habits","🔁"],["notes","Notes","📝"],["apps","Internships","🚀"],
+  ["habits","Habits","🔁"],["notes","Notes","📝"],["study","Study","🧠"],["apps","Internships","🚀"],
   ["friends","Friends","👥"],["money","Money","💸"],["grades","Grades","📊"],["reflect","Reflect","🌙"],["faith","Faith","🕊"],["settings","Settings","⚙️"]
 ];
 let palSel = 0, palList = [];
@@ -2622,6 +2768,12 @@ document.body.addEventListener("click",e=>{
     return addScore(gas.dataset.gaddscore, row.querySelector(".gScoreLabel").value, row.querySelector(".gScoreGot").value, row.querySelector(".gScoreMax").value);
   }
   const gac  = e.target.closest("[data-gaddcat]");if(gac) return addCat($("#gCatName").value, $("#gCatWeight").value);
+  const sst = e.target.closest("[data-studystart]");  if(sst) return startStudy(null);
+  const snt = e.target.closest("[data-studynote]");   if(snt) return startStudy(snt.dataset.studynote);
+  const srv = e.target.closest("[data-studyreveal]"); if(srv){ if(studySession) studySession.showAnswer = true; render(); return; }
+  const sgr = e.target.closest("[data-studygrade]");  if(sgr) return studyGrade(sgr.dataset.studygrade);
+  const sen = e.target.closest("[data-studyend]");    if(sen) return endStudy();
+  const sgn = e.target.closest("[data-studygonotes]");if(sgn) return switchView("notes");
 });
 $("#focusMini").addEventListener("click",()=>switchView("today"));
 document.body.addEventListener("change",e=>{
@@ -2639,6 +2791,7 @@ $("#quickInput").addEventListener("keydown",e=>{
 $("#quickInput").addEventListener("input",e=>renderNlPreview(e.target.value));
 $("#reflectNudge").addEventListener("click",()=>switchView("reflect"));
 $("#recapNudge").addEventListener("click",()=>switchView("progress"));
+$("#studyNudge").addEventListener("click",()=>switchView("study"));
 $("#tAdd").addEventListener("click",()=>{
   addTask($("#tTitle").value, $("#tClass").value, $("#tDue").value, $("#tPriority").value);
   $("#tTitle").value=""; $("#tDue").value="";
