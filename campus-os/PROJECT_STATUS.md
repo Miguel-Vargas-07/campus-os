@@ -25,7 +25,8 @@
 
 ## Version
 
-- **v0.16** — July 16, 2026. Schedule-aware Today / "plan my day" (schema 12).
+- **v0.17** — July 16, 2026. Grades + what-do-I-need-on-the-final (schema 13).
+- v0.16 — July 16, 2026. Schedule-aware Today / "plan my day" (schema 12).
 - v0.15 — July 16, 2026. Natural-language quick add (schema 11, unchanged).
 - v0.14 — July 15, 2026. Money view (schema 11).
 - v0.13 — July 15, 2026. Focus timer (schema 10).
@@ -42,10 +43,29 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.16)
+## What is DONE (v0.17)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
+
+- [x] **Grades + what-do-I-need-on-the-final (v0.17):** new Grades view
+      (nav MAIN after Money, no digit shortcut, in the command palette) —
+      per-class grading with weighted categories and scores. Class chips
+      show a live mini badge (`87.0% B+`) once scored. Stat cards: CURRENT
+      GRADE (weighted mean over scored categories, normalized by their
+      weight sum), TARGET (inline-editable, like Money's budget field),
+      NEEDED ON FINAL (solves for the score needed on the category marked
+      FINAL to hit target — green if at/under the current average, amber
+      if reachable but harder, flag-red "not reachable" with a best-case
+      % when even a perfect final can't get there, "Secured 🎉" when
+      already there). Categories: weight %, one-at-a-time FINAL toggle,
+      inline add-score (label/got/max) and add-category (name/weight)
+      forms, delete with confirm on categories (cascades their scores).
+      Weight-sum-≠-100% warning (suppressed on a still-empty category
+      list). `grading: null` onboarding empty state per class.
+      SCHEMA_VERSION = 13: migrate() adds `grading: null` to every class;
+      `seed()` gives CS 101 a worked example (Homework 30%, Midterm 30%,
+      Final 40%) instead — verified by hand against the live render.
 
 - [x] **Schedule-aware Today / "plan my day" (v0.16, signature feature):**
       classes carry `meetings` (day-of-week + start/end); a new vertical
@@ -179,11 +199,10 @@ localStorage + export/import, responsive, seed data), plus:
 
 ## What is NOT done — NEXT UP: follow docs/BUILD_PLAN.md
 
-**`docs/BUILD_PLAN.md` is the authoritative spec for v0.17–v0.19**
+**`docs/BUILD_PLAN.md` is the authoritative spec for v0.18–v0.19**
 (written July 15 2026 from competitive research; implement in order, one
 version per commit, browser-verified):
 
-- [ ] v0.17 — Grades + what-do-I-need-on-the-final (schema 13)
 - [ ] v0.18 — Flashcards, spaced repetition from notes (schema 14)
 - [ ] v0.19 — PWA: installable + offline (adds manifest/sw.js/icons files)
 
@@ -265,8 +284,42 @@ per DESIGN.md). Weekend empty-state and the 30–59min gap-sizing branch
 were verified by code review only (couldn't manipulate system day-of-week
 or engineer that exact gap scenario in the time available) — worth a
 live check if either is ever suspected of a bug. Zero console errors.
-Committed locally; **not pushed** — holding for Miguel to check the work
-before starting v0.17.
+Committed and pushed (Miguel approved after reviewing, said to keep going).
+
+Continued straight into **v0.17 grades + what-do-I-need-on-the-final**
+(schema 13) — see the DONE list above for the feature summary. Learned one
+more thing about the verification technique from earlier in this session:
+the `new Function(scriptBody)()` full-script re-execution check is great
+for a one-time "does this even parse" gate, but running it and THEN
+continuing to interact with the same tab double-registers every event
+listener (the diagnostic's own full boot sequence re-runs `load()` +
+all the `addEventListener` wiring on top of the real page's), which caused
+clicks to behave inconsistently (each click firing two independent
+closures' handlers against two independent copies of `state`). Fixed by
+always reloading fresh immediately after that specific check and never
+interacting with the same tab afterward without a reload in between; all
+the actual feature testing below used direct DOM `.click()` /
+`dispatchEvent` / `form_input` on a cleanly (single-)loaded page. Hand-
+computed the seed data's math on paper first — current grade
+(90·30+84·30)/60 = 87.0% (B+), needed-on-final (90−87·0.6)/0.4 = 94.5% —
+and the live render matched to the decimal. Also verified: weight-sum
+warning appears/disappears correctly (and is suppressed specifically when
+a class has zero categories yet, a small UX fix made mid-session — the
+literal spec behavior would've shown "weights sum to 0%" immediately
+after clicking "Add first category," before the user could add anything);
+final-category exclusivity (toggling a new one clears the old); a crafted
+"secured" scenario (target 50%, cur 100%) → "Secured 🎉"; a crafted
+"unreachable" scenario (target 95%, cur 20%) → "Not reachable — best case
+52.0%" (hand-matched); migration v12→13 on a crafted pre-existing v12
+payload; the onboarding empty state and "Add first category" flow;
+add/delete category and add/delete score; the inline TARGET number input;
+palette entry and navigation; dark scheme. Category deletion's
+`confirm()` dialog blocks this session's automation entirely (times out
+the tool call) — not tested live, but it's the identical pattern already
+used safely by the pre-existing `deleteClass`/`deleteHabit`/`deleteNote`,
+so verified by code review only. Zero console errors. Committed locally;
+**not pushed** — holding for Miguel to check the work before starting
+v0.18.
 
 Session 8 (July 15, 2026, same sitting as session 7): Miguel's idea notes
 (`docs/CAPMUS-OS NOTES.txt` — filename typo kept at his call: dashboard,

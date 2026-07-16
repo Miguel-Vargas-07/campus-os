@@ -252,7 +252,7 @@ dark scheme; zero console errors.
 
 ---
 
-## v0.17 — Grades: current grade + "what do I need on the final"
+## v0.17 — Grades: current grade + "what do I need on the final" ✅ SHIPPED
 
 **SCHEMA_VERSION → 13.** The classic student hook (MyStudyLife, every
 grade-calculator site). Uses the existing classes DB.

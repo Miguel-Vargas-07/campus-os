@@ -481,6 +481,80 @@ plans: [ { id, date:"YYYY-MM-DD", taskId, start:"HH:MM", mins:Number } ]
   `.map()`'s index argument would land in `showPlan` and show the button
   on every row past the first).
 
+## v0.17 additions (SCHEMA_VERSION = 13)
+
+**Grades: current grade + what-do-I-need-on-the-final:**
+
+```js
+// classes[] gains:
+grading: null | {
+  target: 90,
+  cats: [ { id, name:"Homework", weight:30, isFinal:false,
+            scores: [ { id, label:"HW1", got:18, max:20 } ] } ]
+}
+```
+
+- `migrate()` v12→13: every class gets `grading: null`. `seed()` gives
+  CS 101 a worked example directly (Homework 30% / two scores, Midterm
+  30% / one score, Final 40% `isFinal:true` / no scores yet, target 90) —
+  hand-verified against the live render: current grade 87.0% (B+), needed
+  on final 94.5%.
+- `catAvg(cat)` = `Σgot/Σmax × 100` over its scores, or `null` if scoreless.
+  `weightSum(cats)` sums `.weight` across a list. `currentGrade(g)` =
+  weighted mean of `catAvg` over categories with ≥1 score, normalized by
+  *their* weight sum (not all categories') — `null` if nothing's scored
+  yet. `letterGrade(pct)` walks the `LETTERS` table (`A/A-/B+/…/F`, plain
+  ASCII hyphen for "minus" rather than a Unicode minus sign — v0.15/v0.16
+  both hit real bugs from stray non-ASCII punctuation landing in code
+  strings mid-edit, see PROJECT_STATUS.md's session log, so new code
+  strings stick to ASCII on purpose).
+- `finalOutlook(g)` → `{wF, cur, needed, best}` or `null` if no category
+  is marked `isFinal`. `wF` = final category's weight ÷ 100. `cur` =
+  `currentGrade` restricted to non-final scored categories (scoreless
+  non-final categories are assumed to land at `cur` — matches the spec's
+  "grade so far" framing). `needed = (target − cur×(1−wF)) / wF`; `best`
+  = the ceiling if the final is aced (`cur×(1−wF) + 100×wF`). The render
+  layer turns this into one of four states: `needed≤0` → "Secured 🎉";
+  `needed>100` → "Not reachable — best case `best`%"; otherwise the %,
+  colored green if `needed≤cur` (coasting) else amber (need to raise your
+  average). `wF≤0` (no final category, or it's 0-weighted) → prompt to
+  mark one FINAL.
+- Actions all operate on `selectedGradeClass` (module var, mirrors
+  `selectedApp`/`selectedNote`) via `currentGradeClass()` rather than
+  threading a classId through every `data-g*` attribute: `setupGrading()`
+  (creates `{target:90,cats:[]}`), `setTarget(v)`, `addCat(name,weight)`,
+  `delCat(catId)` (confirms — cascades its scores, same pattern as
+  `deleteClass`/`deleteHabit`), `setFinalCat(catId)` (toggles; setting one
+  clears all others — "exactly one FINAL" is enforced here, not by input
+  validation), `addScore(catId,label,got,max)`, `delScore(catId,scoreId)`.
+- `renderGrades()`: class chips (`data-gsel`) show a live `87.0% B+`
+  badge once `currentGrade` is non-null. Selected class with no `grading`
+  gets an onboarding empty state (`data-gsetup` just initializes the
+  empty shell — reuses the normal add-category form immediately after,
+  rather than duplicating one). Otherwise: 3-up `.stats` row (current /
+  target / needed), a weight-sum warning (`.hint`, flag-colored) shown
+  only when there's ≥1 category AND the sum isn't 100 — deliberately
+  suppressed at zero categories, since "weights sum to 0%" the instant
+  someone clicks "Add first category" reads as a false alarm, not a
+  spec requirement — then one `.gcat-row` per category (weight, `FINAL`
+  chip via `.chip.gold`/`.chip.todo`, avg, delete, its scores as small
+  chips, an inline add-score form), then the add-category form. The
+  per-category add-score inputs are plain classes (`.gScoreLabel` etc,
+  not ids — there can be several categories at once); the delegated
+  `data-gaddscore` handler finds its own row's inputs via
+  `closest(".form-row")`. Neither this nor the add-category inputs are
+  manually cleared after submit — the whole `#gradeDetail` subtree is
+  rebuilt from `state` every render, so fresh (empty) inputs is the
+  natural outcome, not something to special-case.
+- Nav: MAIN group after Money, no digit shortcut (1–0 taken). Palette
+  entry `["grades","Grades","📊"]` in `PAL_VIEWS`.
+- A delegated `document.body` "Enter submits" keydown handler was added
+  for the grade forms (`.gScoreLabel/Got/Max` → that row's add-score
+  button; `#gCatName`/`#gCatWeight` → the add-category button) since
+  every other add-form in the app supports Enter and these are rebuilt-
+  on-render fields that can't take a one-time static listener the way
+  `#tTitle` etc. do.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the
