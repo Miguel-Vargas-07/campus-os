@@ -25,7 +25,8 @@
 
 ## Version
 
-- **v0.15** — July 16, 2026. Natural-language quick add (schema 11, unchanged).
+- **v0.16** — July 16, 2026. Schedule-aware Today / "plan my day" (schema 12).
+- v0.15 — July 16, 2026. Natural-language quick add (schema 11, unchanged).
 - v0.14 — July 15, 2026. Money view (schema 11).
 - v0.13 — July 15, 2026. Focus timer (schema 10).
 - v0.12 — July 15, 2026. Command palette (Ctrl+K).
@@ -41,10 +42,29 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.15)
+## What is DONE (v0.16)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
+
+- [x] **Schedule-aware Today / "plan my day" (v0.16, signature feature):**
+      classes carry `meetings` (day-of-week + start/end); a new vertical
+      timeline card sits between the greet-card and the today-grid,
+      rendering today's class blocks (colored by class) and planned-task
+      blocks to scale, with an hour-gridline background, a live "now"
+      line, and collision handling that offsets overlapping blocks into
+      lanes. "＋ Plan" on any Due-soon row auto-places that task into the
+      first free gap today (60min default, sized down to the gap if it's
+      30–59min); re-clicking an already-planned task's button ("↻ Replan")
+      moves it; ✕ unplans. Done tasks strike their plan block. Free-time
+      budget (🕐 Xh free, gaps ≥15min before 22:00) shows in the greet-card
+      hero. Empty states for no-schedule weekdays and weekends.
+      `parseScheduleString(s)` best-effort parses free-text schedules
+      ("MWF 10am", "TuTh 2:30pm", "Mon/Wed 14:00") into a meeting; the
+      class-creation form gained day toggles + start/end time inputs to
+      set it directly. SCHEMA_VERSION = 12: migrate() gives every class a
+      parsed `meetings` array (from its legacy schedule text) and adds
+      `plans: []`; `load()` prunes plan entries older than 14 days.
 
 - [x] **Natural-language quick add (v0.15):** `parseQuickTask(raw)` parses
       free text into title/class/date/priority — `!high`/`!h` `!med`/`!m`
@@ -159,11 +179,10 @@ localStorage + export/import, responsive, seed data), plus:
 
 ## What is NOT done — NEXT UP: follow docs/BUILD_PLAN.md
 
-**`docs/BUILD_PLAN.md` is the authoritative spec for v0.16–v0.19**
+**`docs/BUILD_PLAN.md` is the authoritative spec for v0.17–v0.19**
 (written July 15 2026 from competitive research; implement in order, one
 version per commit, browser-verified):
 
-- [ ] v0.16 — Schedule-aware Today "plan my day" (schema 12) ← signature feature
 - [ ] v0.17 — Grades + what-do-I-need-on-the-final (schema 13)
 - [ ] v0.18 — Flashcards, spaced repetition from notes (schema 14)
 - [ ] v0.19 — PWA: installable + offline (adds manifest/sw.js/icons files)
@@ -204,9 +223,50 @@ command-palette edit landed with straight quotes silently turned into
 curly quotes in one block — syntactically invalid but silent at load time
 because it sat inside `palBuild`'s `if(ql)` branch, which only runs on a
 non-empty query, so it never fired during boot-time rendering. Re-verified
-clean after the fix; zero console errors. No schema change. Committed
-locally; **not pushed** — holding for Miguel to check the work before
-starting v0.16.
+clean after the fix; zero console errors. No schema change. Committed and
+pushed (Miguel approved after reviewing).
+
+Same session, continued straight into **v0.16 schedule-aware Today / "plan
+my day"** (signature feature, schema 12) — see the DONE list above for the
+feature summary. Found a much more reliable verification technique partway
+through: `fetch()` the served file, extract the inline `<script>` body, and
+run it via `new Function(body)()` wrapped in try/catch — this executes the
+*entire* script (not just one function) and surfaces syntax errors the
+browser pane's console reader was silently swallowing. It caught a real
+bug immediately: `data-cday` (the new class-meeting day-toggle handler)
+was accidentally named `cdy` in the delegated click listener, colliding
+with the pre-existing `data-calday` handler's `const cdy` in the same
+function scope — a hard `SyntaxError` that silently killed the *entire*
+script (nothing rendered, nothing was clickable) because `read_console_messages`
+never surfaced it. Renamed to `clsd` and re-verified clean. Also caught
+(via code review, before it ever ran) a classic footgun: `taskRow` gained
+an optional second parameter, and one leftover call site used
+`list.map(taskRow)` directly — `.map()` passes `(element, index, array)`,
+so the Assignments List view would have silently shown a "＋ Plan" button
+on every task past the first. Fixed to `list.map(t=>taskRow(t))`. Also
+learned this session's `computer` tool (click/type/key) doesn't reliably
+dispatch events the app receives — not just typing (found in the v0.15
+entry above) but clicks too (a real `computer.left_click` on "Add class"
+silently no-opped; `document.getElementById(...).click()` via
+`javascript_tool` worked immediately after). All v0.16 verification below
+used that DOM-`.click()` + `form_input` + direct `localStorage`/DOM-state
+reads instead. Confirmed: migration v11→12 on real pre-existing v11
+localStorage (CS101's "MWF 10am" text → a parsed 60-min meeting; Math's
+blank schedule text → correctly stayed empty); fresh-seed timeline
+geometry hand-verified against the render (block top/height in px, now-line
+position, free-time hours all matched by-hand math); ＋ Plan placed a task
+into the first real gap and persisted across reload; unplan removed it;
+marking a planned task done struck its timeline block; a new class created
+via the day-toggle + time-input UI produced the exact right `meetings`
+shape and the toggle state reset after; two overlapping meetings correctly
+split into offset lanes (0px / 12px); dark scheme re-rendered the timeline
+correctly via `color-mix(..., var(--card))` (tokens only, dark mode free,
+per DESIGN.md). Weekend empty-state and the 30–59min gap-sizing branch
+were verified by code review only (couldn't manipulate system day-of-week
+or engineer that exact gap scenario in the time available) — worth a
+live check if either is ever suspected of a bug. Zero console errors.
+Committed locally; **not pushed** — holding for Miguel to check the work
+before starting v0.17.
 
 Session 8 (July 15, 2026, same sitting as session 7): Miguel's idea notes
 (`docs/CAPMUS-OS NOTES.txt` — filename typo kept at his call: dashboard,

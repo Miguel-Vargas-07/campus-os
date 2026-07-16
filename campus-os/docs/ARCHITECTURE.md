@@ -413,6 +413,74 @@ money: {
 - Assignments' explicit add-task form is untouched — NL parsing applies
   only to the two quick-add surfaces, per spec.
 
+## v0.16 additions (SCHEMA_VERSION = 12)
+
+**Schedule-aware Today / "plan my day" (signature feature):**
+
+```js
+// classes[] gains:
+meetings: [ { days:[0..6], start:"HH:MM", end:"HH:MM" } ]  // days 0=Mon, matches DAY_LETTERS
+// state gains:
+plans: [ { id, date:"YYYY-MM-DD", taskId, start:"HH:MM", mins:Number } ]
+```
+
+- `migrate()` v11→12: every class gets `meetings` via best-effort
+  `parseScheduleString(c.schedule||"")`; `plans` defaults to `[]`.
+  `load()` additionally prunes `plans` entries older than 14 days on every
+  boot (not part of migrate — applies to fresh-seeded state too).
+- `parseScheduleString(s)`: extracts the first `H(:MM)?(am|pm)?` time match
+  (bare 1–7 with no am/pm assumed afternoon), then scans the text BEFORE
+  that time for day tokens via `SCHED_DOW_RE` (a single alternation built
+  from `SCHED_DOW_TOKENS`, ordered longest-token-first so `"tue"` matches
+  before `"t"`; covers full names, 3-letter, 2-letter, and 1-letter forms —
+  `M`/`T`(Tue)/`W`/`R`or`Th`(Thu)/`F`/`Sa`/`Su`). Returns one meeting
+  `{days, start, end:start+60min}`, or `[]` if no time or no day matched.
+  Reset `SCHED_DOW_RE.lastIndex = 0` at the top of every call (it's a
+  shared `g`-flag regex). `seed()` does NOT call this — CS 101 and Math
+  get hand-picked demo meetings (50min / 75min) directly.
+- Time helpers: `hmToMin("HH:MM")→Number`, `minToHM(Number)→"HH:MM"`
+  (wraps negative/>1440 input into a valid day).
+- `meetingsOn(ds)` → today's class meetings as `{class, start, end}` (min
+  since midnight). `dayItems(ds)` merges meetings + `plans` for that date
+  into `{type:"class"|"plan", start, end, ...}`, sorted. `freeGaps(ds,
+  fromMin, toMin)` subtracts `dayItems` from a `[fromMin,toMin)` window.
+  `freeTimeToday()` sums `freeGaps` (≥15min gaps, now→22:00) for the
+  greet-card stat; 0 after 22:00.
+- `planTask(taskId)`: clears any existing plan for that task today (so
+  re-planning moves it), takes the first `freeGaps` window ≥30min at/after
+  now, sizes the block to `min(60, gapLength)`; with no such gap, appends
+  after the latest `dayItems` end (or now/8am if the day is empty).
+  Planning only ever targets **today** in v1. `removePlan(id)` deletes.
+  `deleteTask(id)` also prunes any plan pointing at the deleted task.
+- `renderDayPlan()` (called from `renderToday()`): empty state (weekday
+  "no schedule yet" / weekend "enjoy it") when `dayItems(today)` is empty;
+  otherwise a `PX_PER_MIN = 0.75` absolutely-positioned timeline spanning
+  `[min(8am, firstBlock−1h), max(8pm, lastBlock+1h)]` inside `.timeline`
+  (`max-height:420px; overflow-y:auto`). Collision handling: items sorted
+  by start, each assigned the first "lane" (12px `margin-left` each) whose
+  previous occupant already ended. Class blocks tint via `color-mix(in
+  srgb, <color> 15%, var(--card))` — tokens only, dark mode free. Plan
+  blocks show the task title + unplan ✕; done tasks get `.done` (struck,
+  55% opacity). A `.tl-now` line/dot renders at the current time. Auto-
+  scrolls to center "now" once per view-entry only — `dayPlanScrolled`
+  (module var) is reset in `switchView()` when navigating to `"today"`,
+  so later in-place re-renders (habit checks, etc.) don't fight a user's
+  manual scroll.
+- Meeting entry UI: the inline class-create form (`#clsForm`) gained a
+  `.day-tgl` row (`#cDayToggles`, reusing the habit-schedule-editor's
+  button styling, module state `newClassDays`, delegated `data-cday`) plus
+  `<input type="time">` `#cStart`/`#cEnd`. `addClass()` builds `meetings`
+  from these only when a day is picked and `end>start`; the free-text
+  `#cSched` field is unchanged and independent (display-only fallback).
+  Editing an existing class's meetings isn't in v1 (creation only, per
+  spec).
+- `taskRow(t, showPlan)` gained an optional second param — the "＋ Plan" /
+  "↻ Replan" button renders only when `showPlan` is truthy (Today's
+  Due-soon list passes `true`; every other caller must use an explicit
+  wrapper like `list.map(t=>taskRow(t))`, never bare `list.map(taskRow)` —
+  `.map()`'s index argument would land in `showPlan` and show the button
+  on every row past the first).
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the

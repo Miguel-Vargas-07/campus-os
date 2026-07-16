@@ -163,7 +163,7 @@ row shows parsed sub-label. Zero console errors.
 
 ---
 
-## v0.16 — Schedule-aware Today: "Plan my day" (SIGNATURE FEATURE)
+## v0.16 — Schedule-aware Today: "Plan my day" (SIGNATURE FEATURE) ✅ SHIPPED
 
 **SCHEMA_VERSION → 12.** Inspired by Structured/Shovel/Sunsama: render
 today's class meetings on a timeline, show free gaps, let tasks be planned
