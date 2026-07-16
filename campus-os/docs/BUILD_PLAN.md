@@ -101,7 +101,7 @@ that's a free migration test; check `state.schema` after reload.
 
 ---
 
-## v0.15 — Natural-language quick add ("PS4 due fri #cs101 !high")
+## v0.15 — Natural-language quick add ("PS4 due fri #cs101 !high") ✅ SHIPPED
 
 **No schema change (stays 11).** Inspired by Todoist: capture friction kills
 task systems; one line should carry title + date + class + priority.

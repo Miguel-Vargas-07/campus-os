@@ -25,7 +25,8 @@
 
 ## Version
 
-- **v0.14** — July 15, 2026. Money view (schema 11).
+- **v0.15** — July 16, 2026. Natural-language quick add (schema 11, unchanged).
+- v0.14 — July 15, 2026. Money view (schema 11).
 - v0.13 — July 15, 2026. Focus timer (schema 10).
 - v0.12 — July 15, 2026. Command palette (Ctrl+K).
 - v0.11 — July 15, 2026. Assignments views: List / Board / Calendar.
@@ -40,10 +41,25 @@
 - v0.2 — July 14, 2026. UI modernization + Reflect + Faith views.
 - v0.1 — July 14, 2026. Initial build.
 
-## What is DONE (v0.14)
+## What is DONE (v0.15)
 
 Everything from v0.1 (Today, Assignments, Habits, Notes, Settings,
 localStorage + export/import, responsive, seed data), plus:
+
+- [x] **Natural-language quick add (v0.15):** `parseQuickTask(raw)` parses
+      free text into title/class/date/priority — `!high`/`!h` `!med`/`!m`
+      `!low`/`!l` priority tags, `#code` class match (code → exact name →
+      unique name prefix; no match leaves the token in the title, never
+      auto-creates a class), `today`/`tod`, `tomorrow`/`tmr`/`tom`, day
+      names (`fri`/`friday` → next occurrence), `M/D` explicit dates (rolls
+      to next year if already past), `+Nd` relative dates, filler word
+      `due` dropped only when followed by a date token. First
+      priority/class/date token wins; later ones stay in the title; empty
+      title after parsing returns `null` (caller no-ops, nothing added).
+      Wired into Today's `#quickInput` (live `#nlPreview` chips on
+      `input`, reusing `.chip` styles) and the command palette's quick-add
+      row (parsed sub-label, e.g. `NEW TASK · Fri Jul 17 · CS101 · HIGH`).
+      Assignments' explicit form is untouched. No schema change.
 
 - [x] **UI refresh:** dark pine gradient sidebar with grouped nav
       (MAIN / INNER / SYSTEM), gradient active-nav pill, 14px card radius,
@@ -143,11 +159,10 @@ localStorage + export/import, responsive, seed data), plus:
 
 ## What is NOT done — NEXT UP: follow docs/BUILD_PLAN.md
 
-**`docs/BUILD_PLAN.md` is the authoritative spec for the next five
-versions** (written July 15 2026 from competitive research; implement in
-order, one version per commit, browser-verified):
+**`docs/BUILD_PLAN.md` is the authoritative spec for v0.16–v0.19**
+(written July 15 2026 from competitive research; implement in order, one
+version per commit, browser-verified):
 
-- [ ] v0.15 — Natural-language quick add (no schema change)
 - [ ] v0.16 — Schedule-aware Today "plan my day" (schema 12) ← signature feature
 - [ ] v0.17 — Grades + what-do-I-need-on-the-final (schema 13)
 - [ ] v0.18 — Flashcards, spaced repetition from notes (schema 14)
@@ -168,6 +183,30 @@ After those (see docs/ROADMAP.md):
 5. After any work session, update this file's DONE/NOT DONE lists and version.
 
 ## Last session summary
+
+Session 9 (July 16, 2026): Miguel pointed Claude at `docs/BUILD_PLAN.md`
+and asked for v0.15–v0.19 to be built one at a time, verified between
+each. Shipped **v0.15 natural-language quick add**: `parseQuickTask(raw)`
+parses priority/class/date tokens out of free text per the BUILD_PLAN
+spec, wired into Today's quick-add (live `#nlPreview` chips) and the
+command palette's quick-add row (parsed sub-label). Verified live in
+browser: the browser pane's synthetic `type`/`key` actions turned out not
+to dispatch real DOM events this session (confirmed against the
+pre-existing, unmodified notes-search box too, so it's an environment
+quirk, not a regression) — verification used the `form_input` tool
+instead, which does dispatch real events. Confirmed: full-combo input
+("...fri #cs101 !high"-style) → correct Jul 17 / CS101 / HIGH preview
+chips; "read ch 3 #nope" → no class match, chips hidden, "#nope" stays
+literal; "fri" alone → empty title, parser returns `null`, chips stay
+hidden; palette query "essay tue #math !l" → sub-label "NEW TASK · Tue,
+Jul 21 · Math · LOW". Caught and fixed one real bug before commit: the
+command-palette edit landed with straight quotes silently turned into
+curly quotes in one block — syntactically invalid but silent at load time
+because it sat inside `palBuild`'s `if(ql)` branch, which only runs on a
+non-empty query, so it never fired during boot-time rendering. Re-verified
+clean after the fix; zero console errors. No schema change. Committed
+locally; **not pushed** — holding for Miguel to check the work before
+starting v0.16.
 
 Session 8 (July 15, 2026, same sitting as session 7): Miguel's idea notes
 (`docs/CAPMUS-OS NOTES.txt` — filename typo kept at his call: dashboard,

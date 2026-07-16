@@ -381,6 +381,38 @@ money: {
 - Nav: Money sits in MAIN after Friends, with **no digit shortcut** (1–0
   are all taken) — reachable via sidebar or the palette ("Go to Money").
 
+## v0.15 additions (no schema change)
+
+**Natural-language quick add:**
+
+- `parseQuickTask(raw)` → `{title, classId, due, priority, explicitPriority}`
+  (`explicitPriority` is an extra field, preview-only — see below).
+  Tokenizes on whitespace; each token is tried in order against priority
+  (`!high`/`!h` `!med`/`!m` `!low`/`!l`, first one wins) → class (`#code`,
+  only while unmatched) → date (`today`/`tod`, `tomorrow`/`tmr`/`tom`, day
+  names via `nlDateFromDow`, `M/D`, `+Nd`, filler `due` dropped only when
+  the next token is date-shaped) → else the token stays in the title.
+  First match per field wins; later conflicting tokens fall through to the
+  title untouched. An unmatched `#code` never auto-creates a class — it
+  just stays in the title. Empty title after parsing → `null` (both call
+  sites no-op on `null`).
+- `nlMatchClass(name)`: `class.code` (spaces/case stripped) → exact
+  `class.name` (case-insensitive) → unique case-insensitive name prefix;
+  ambiguous or no match → `null`.
+- `renderNlPreview(raw)` mirrors `parseQuickTask` into `#nlPreview` chips
+  (`.nl-prev`, reuses existing `.chip` classes — due and class both use
+  `.chip.todo`, priority uses `.chip.high/med/low` but ONLY when
+  `explicitPriority` is true, so the default "med" doesn't render a chip
+  on every keystroke). Hidden whenever nothing recognizable parsed.
+- Wired at `#quickInput`: `input` → `renderNlPreview`; Enter → parse, no-op
+  on `null`, else `addTask(t.title,t.classId,t.due,t.priority)` then clear
+  the field. Also wired into `palBuild`'s quick-add row — its `sub` label
+  shows the parsed pieces (e.g. `NEW TASK · Fri Jul 17 · CS101 · HIGH`);
+  if parsing empties the title, it falls back to a plain-title task using
+  the raw query, same as pre-v0.15 behavior.
+- Assignments' explicit add-task form is untouched — NL parsing applies
+  only to the two quick-add surfaces, per spec.
+
 ## AI helper (planned, not built) — plan of record
 - Direct browser → Anthropic Messages API with the user's own key
   (stored in localStorage, entered in Settings; requires the
